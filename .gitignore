@@ -1,0 +1,28 @@
+# Unity generated folders
+BubbleGame/Library/
+BubbleGame/Temp/
+BubbleGame/Obj/
+BubbleGame/Build/
+BubbleGame/Builds/
+BubbleGame/Logs/
+BubbleGame/UserSettings/
+
+# Unity generated files
+BubbleGame/*.csproj
+BubbleGame/*.sln
+BubbleGame/*.user
+BubbleGame/*.pidb
+BubbleGame/*.booproj
+BubbleGame/*.svd
+BubbleGame/*.pdb
+BubbleGame/*.mdb
+BubbleGame/*.opendb
+BubbleGame/*.VC.db
+
+# OS/editor files
+.vs/
+.vscode/
+*.tmp
+*.log
+Thumbs.db
+Desktop.ini
