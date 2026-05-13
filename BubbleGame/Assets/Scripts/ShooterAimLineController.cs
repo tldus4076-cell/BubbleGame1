@@ -22,6 +22,15 @@ public class ShooterAimLineController : MonoBehaviour
     [Tooltip("조준선 길이입니다.")]
     [SerializeField] private float lineLength = 5f;
 
+    [Tooltip("벽에 부딪힌 뒤 최대 몇 번까지 반사해서 조준선을 그릴지 정합니다. 1이면 한 번만 꺾입니다.")]
+    [SerializeField] private int maxReflections = 1;
+
+    [Tooltip("조준선 Raycast가 먼저 감지할 벽 Layer입니다. 벽이 wall Layer라면 wall을 체크하세요. 잘못 설정해도 전체 Layer를 한 번 더 검사합니다.")]
+    [SerializeField] private LayerMask wallLayerMask = 1;
+
+    [Tooltip("반사 후 같은 벽을 다시 맞지 않도록 충돌 지점에서 아주 조금 떨어져 다시 검사하는 거리입니다.")]
+    [SerializeField] private float raycastStartPadding = 0.02f;
+
     [Tooltip("조준선 두께입니다.")]
     [SerializeField] private float lineWidth = 0.05f;
 
@@ -44,6 +53,10 @@ public class ShooterAimLineController : MonoBehaviour
     // LineRenderer에 사용할 머티리얼입니다.
     // 머티리얼은 선에 색이나 이미지를 입히는 재료라고 생각하면 됩니다.
     private Material lineMaterial;
+
+    // 조준선 꺾임 지점들을 담아두는 배열입니다.
+    // 매 프레임 새 배열을 만들지 않기 위해 재사용합니다.
+    private Vector3[] aimLinePoints;
 
     // Awake는 게임이 시작될 때 Start보다 먼저 한 번 호출됩니다.
     private void Awake()
@@ -206,11 +219,93 @@ public class ShooterAimLineController : MonoBehaviour
         // 선 시작점은 슈터 위치에서 앞쪽으로 살짝 이동한 지점입니다.
         Vector3 startPoint = aimDirectionSource.position + worldDirection * lineStartOffset;
 
-        // 선 끝점은 시작점에서 앞쪽으로 lineLength만큼 더 간 지점입니다.
-        Vector3 endPoint = startPoint + worldDirection * lineLength;
+        // 벽에 닿으면 꺾이도록 조준선 경로를 계산해서 그립니다.
+        DrawReflectedAimLine(startPoint, worldDirection);
+    }
 
-        // LineRenderer에 시작점과 끝점을 넣어 선을 그립니다.
-        lineRenderer.SetPosition(0, startPoint);
-        lineRenderer.SetPosition(1, endPoint);
+    // 벽에 닿으면 반사되는 조준선을 계산해서 LineRenderer에 넣는 함수입니다.
+    private void DrawReflectedAimLine(Vector3 startPoint, Vector3 worldDirection)
+    {
+        // Inspector에서 이상한 값이 들어와도 안전하게 보정합니다.
+        int safeMaxReflections = Mathf.Max(0, maxReflections);
+        float safeLineLength = Mathf.Max(0.01f, lineLength);
+        float safePadding = Mathf.Max(0.001f, raycastStartPadding);
+
+        // 시작점 1개 + 반사 지점 개수 + 마지막 끝점 1개가 필요합니다.
+        int neededPointCount = safeMaxReflections + 2;
+
+        if (aimLinePoints == null || aimLinePoints.Length != neededPointCount)
+        {
+            aimLinePoints = new Vector3[neededPointCount];
+        }
+
+        Vector2 currentOrigin = startPoint;
+        Vector2 currentDirection = new Vector2(worldDirection.x, worldDirection.y).normalized;
+        float remainingLength = safeLineLength;
+        int pointCount = 1;
+
+        // 첫 번째 점은 항상 조준선 시작점입니다.
+        aimLinePoints[0] = startPoint;
+
+        for (int reflectionIndex = 0; reflectionIndex <= safeMaxReflections; reflectionIndex++)
+        {
+            // 남은 길이만큼 앞으로 Raycast를 쏩니다.
+            // Raycast는 보이지 않는 선을 쏴서 Collider2D와 부딪혔는지 확인하는 기능입니다.
+            RaycastHit2D hit = CastAimRay(currentOrigin, currentDirection, remainingLength);
+
+            if (hit.collider == null)
+            {
+                // 벽에 닿지 않았다면 남은 길이만큼 직선으로 끝냅니다.
+                aimLinePoints[pointCount] = currentOrigin + currentDirection * remainingLength;
+                pointCount++;
+                break;
+            }
+
+            // 벽에 닿았다면 충돌 지점을 조준선의 다음 점으로 추가합니다.
+            aimLinePoints[pointCount] = hit.point;
+            pointCount++;
+
+            // 이미 최대 반사 횟수만큼 꺾었다면 여기서 조준선을 끝냅니다.
+            if (reflectionIndex >= safeMaxReflections)
+            {
+                break;
+            }
+
+            remainingLength -= hit.distance;
+
+            if (remainingLength <= 0f)
+            {
+                break;
+            }
+
+            // Reflect는 반사 방향을 계산해주는 함수입니다.
+            // hit.normal은 벽 표면이 바라보는 방향입니다.
+            currentDirection = Vector2.Reflect(currentDirection, hit.normal).normalized;
+
+            // 방금 맞은 벽을 바로 다시 맞지 않게 충돌 지점에서 아주 조금 떨어져 다시 시작합니다.
+            currentOrigin = hit.point + currentDirection * safePadding;
+        }
+
+        lineRenderer.positionCount = pointCount;
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            lineRenderer.SetPosition(i, aimLinePoints[i]);
+        }
+    }
+
+    // 조준선 Raycast를 쏘는 함수입니다.
+    // 먼저 Inspector의 Wall Layer Mask로 검사하고, 실패하면 전체 Layer를 한 번 더 검사합니다.
+    private RaycastHit2D CastAimRay(Vector2 origin, Vector2 direction, float distance)
+    {
+        RaycastHit2D hit = Physics2D.Raycast(origin, direction, distance, wallLayerMask);
+
+        if (hit.collider != null)
+        {
+            return hit;
+        }
+
+        // 초보자가 Layer Mask를 잘못 골라도 벽 반사 테스트가 되도록 안전장치를 둡니다.
+        return Physics2D.Raycast(origin, direction, distance, Physics2D.DefaultRaycastLayers);
     }
 }
