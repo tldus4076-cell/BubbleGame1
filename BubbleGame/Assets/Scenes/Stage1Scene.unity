@@ -1668,6 +1668,9 @@ GameObject:
   - component: {fileID: 1527810809}
   - component: {fileID: 1527810810}
   - component: {fileID: 1527810811}
+  - component: {fileID: 1527810812}
+  - component: {fileID: 1527810813}
+  - component: {fileID: 1527810814}
   m_Layer: 6
   m_Name: ' ShooterRoot'
   m_TagString: Untagged
@@ -1745,8 +1748,8 @@ MonoBehaviour:
   showAimLine: 1
   aimDirectionSource: {fileID: 1129255326}
   lineStartOffset: 0.6
-  lineLength: 5
-  maxReflections: 1
+  lineLength: 6.5
+  maxReflections: 2
   wallLayerMask:
     serializedVersion: 2
     m_Bits: 1
@@ -1773,6 +1776,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 74cc98222320f0c4d9c66d63fe2d2f84, type: 3}
   - {fileID: 21300000, guid: d5965a1e010f9e2409cfc329f9b1140a, type: 3}
   - {fileID: 21300000, guid: 2931195512212bc478f0798d0a9f3ff0, type: 3}
+  useGeneratedCircleSprites: 1
   bubbleColors:
   - {r: 1, g: 0, b: 0, a: 1}
   - {r: 0, g: 0, b: 1, a: 1}
@@ -1781,8 +1785,69 @@ MonoBehaviour:
   useRandomBubble: 1
   showCurrentBubble: 1
   sortingOrder: 200
-  bubbleLocalPosition: {x: 0, y: -2.1}
-  bubbleScale: 0.6
+  bubbleLocalPosition: {x: 0, y: 1.43}
+  matchStageBubbleSize: 1
+  bubbleScale: 0.7
+--- !u!114 &1527810812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527810806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5db6b3cc588b1b2468ecc71aaf6b217f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BubbleNextController
+  bubbleSprites:
+  - {fileID: 21300000, guid: 74cc98222320f0c4d9c66d63fe2d2f84, type: 3}
+  - {fileID: 21300000, guid: d5965a1e010f9e2409cfc329f9b1140a, type: 3}
+  - {fileID: 21300000, guid: 2931195512212bc478f0798d0a9f3ff0, type: 3}
+  useGeneratedCircleSprites: 1
+  bubbleColors:
+  - {r: 1, g: 0, b: 0, a: 1}
+  - {r: 0, g: 0, b: 1, a: 1}
+  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  useRandomColor: 0
+  useRandomBubble: 1
+  showNextBubble: 1
+  sortingOrder: 200
+  nextBubbleLocalPosition: {x: -1.5, y: -0.35}
+  matchStageBubbleSize: 1
+  nextBubbleSizeRatio: 0.7
+  nextBubbleScale: 0.4
+--- !u!114 &1527810813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527810806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c26a721daf03214ea92750413d2f655, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BubbleSwapController
+  useTestKey: 1
+--- !u!114 &1527810814
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527810806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa561cc6ffc96d146ab2a3528dece731, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BubbleLauncherController
+  launchSpeed: 15
+  bounciness: 1
+  stageBubbleLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  useSpaceKeyToLaunch: 0
 --- !u!1 &1528846529
 GameObject:
   m_ObjectHideFlags: 0

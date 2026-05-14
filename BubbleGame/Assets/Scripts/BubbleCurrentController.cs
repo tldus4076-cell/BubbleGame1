@@ -10,15 +10,18 @@ public class BubbleCurrentController : MonoBehaviour
     [Tooltip("현재 버블로 사용할 Sprite 목록입니다. 빨강, 파랑, 노랑 버블 이미지를 넣어주세요.")]
     [SerializeField] private Sprite[] bubbleSprites;
 
+    [Tooltip("체크하면 PNG 대신 코드로 만든 깨끗한 원형 버블을 사용합니다. 위치가 안 맞으면 체크하세요.")]
+    [SerializeField] private bool useGeneratedCircleSprites = true;
+
     [Header("현재 버블 색 설정")]
-    [Tooltip("버블에 입힐 색 목록입니다. Sprite가 흰색 버블일 때 색칠용으로 사용할 수 있습니다.")]
+    [Tooltip("버블에 입힐 색 목록입니다. 코드로 만든 원형 버블일 때 이 색을 사용합니다.")]
     [SerializeField] private Color[] bubbleColors = { Color.red, Color.blue, Color.yellow };
 
-    [Tooltip("체크하면 버블 색을 랜덤으로 고릅니다. 색칠이 필요 없으면 꺼도 됩니다.")]
+    [Tooltip("체크하면 버블 색을 랜덤으로 고릅니다.")]
     [SerializeField] private bool useRandomColor = false;
 
     [Header("랜덤 선택 설정")]
-    [Tooltip("체크하면 게임 시작 때 Bubble Sprites 목록 중 하나를 랜덤으로 고릅니다.")]
+    [Tooltip("체크하면 게임 시작 때 버블을 랜덤으로 고릅니다.")]
     [SerializeField] private bool useRandomBubble = true;
 
     [Header("표시 설정")]
@@ -32,26 +35,31 @@ public class BubbleCurrentController : MonoBehaviour
     [Tooltip("ShooterVisual 기준으로 현재 버블을 어디에 보여줄지 정합니다. X는 좌우, Y는 위아래입니다.")]
     [SerializeField] private Vector2 bubbleLocalPosition = new Vector2(0f, 0.8f);
 
-    [Tooltip("현재 버블의 화면 크기입니다. 너무 크거나 작으면 이 값을 조절하세요.")]
+    [Tooltip("체크하면 스테이지 버블과 같은 크기로 자동 맞춥니다.")]
+    [SerializeField] private bool matchStageBubbleSize = true;
+
+    [Tooltip("Match Stage Bubble Size가 꺼져 있을 때 사용할 직접 크기입니다.")]
     [SerializeField] private float bubbleScale = 0.6f;
 
     // SpriteRenderer는 2D 이미지를 화면에 보여주는 Unity 컴포넌트입니다.
-    // 여기서는 현재 발사할 버블 그림을 보여주는 역할을 합니다.
     private SpriteRenderer bubbleRenderer;
 
     // 실제로 이번에 사용할 현재 버블 Sprite를 저장합니다.
-    // Inspector에 보일 필요는 없어서 private으로 둡니다.
     private Sprite selectedBubbleSprite;
 
+    // 코드로 만든 원형 버블 Sprite를 저장합니다.
+    private Sprite[] generatedCircleSprites;
+
+    // 현재 선택된 색 인덱스를 저장합니다.
+    private int selectedColorIndex = 0;
+
     // Awake는 Start보다 먼저 한 번 호출됩니다.
-    // 여기서는 현재 버블을 보여줄 오브젝트와 SpriteRenderer를 먼저 준비합니다.
     private void Awake()
     {
         PrepareBubbleDisplay();
     }
 
     // Start는 게임이 시작될 때 한 번 호출됩니다.
-    // 여기서는 실제로 보여줄 현재 버블 Sprite와 색을 정합니다.
     private void Start()
     {
         SelectCurrentBubble();
@@ -59,8 +67,6 @@ public class BubbleCurrentController : MonoBehaviour
     }
 
     // Update는 매 프레임 호출됩니다.
-    // 이번 기능은 발사 기능이 아니므로 매 프레임 할 일은 많지 않습니다.
-    // 다만 Inspector 값이 바뀌었을 때 위치와 크기가 반영되도록 계속 적용합니다.
     private void Update()
     {
         ApplyTransformSettings();
@@ -70,53 +76,71 @@ public class BubbleCurrentController : MonoBehaviour
     // 현재 버블을 보여줄 오브젝트와 SpriteRenderer를 준비하는 함수입니다.
     private void PrepareBubbleDisplay()
     {
-        // ShooterRoot 아래에 CurrentBubble이라는 자식 오브젝트가 있는지 찾습니다.
-        Transform bubbleTransform = transform.Find("CurrentBubble");
+        // ShooterVisual을 찾습니다.
+        // ShooterVisual은 실제 슈터 그림이 들어있는 자식 오브젝트입니다.
+        Transform shooterVisual = transform.Find("ShooterVisual");
 
-        // CurrentBubble이 없으면 새로 만듭니다.
+        // ShooterVisual이 없으면 ShooterRoot를 기준으로 합니다.
+        Transform parentForBubble = shooterVisual != null ? shooterVisual : transform;
+
+        // ShooterVisual 아래에서 CurrentBubble을 찾습니다.
+        Transform bubbleTransform = parentForBubble.Find("CurrentBubble");
+
         if (bubbleTransform == null)
         {
             GameObject bubbleObject = new GameObject("CurrentBubble");
 
-            // CurrentBubble을 ShooterRoot의 자식으로 넣습니다.
-            // 이렇게 하면 ShooterRoot를 옮겼을 때 현재 버블도 같이 따라갑니다.
-            bubbleObject.transform.SetParent(transform);
-
-            // 새 오브젝트에 SpriteRenderer를 붙입니다.
+            // CurrentBubble을 ShooterVisual의 자식으로 넣습니다.
+            // 이렇게 하면 슈터가 회전할 때 현재 버블도 같이 회전합니다.
+            bubbleObject.transform.SetParent(parentForBubble);
             bubbleRenderer = bubbleObject.AddComponent<SpriteRenderer>();
         }
         else
         {
-            // 이미 CurrentBubble이 있다면 그 오브젝트의 SpriteRenderer를 가져옵니다.
             bubbleRenderer = bubbleTransform.GetComponent<SpriteRenderer>();
-
-            // SpriteRenderer가 없다면 새로 붙입니다.
             if (bubbleRenderer == null)
             {
                 bubbleRenderer = bubbleTransform.gameObject.AddComponent<SpriteRenderer>();
             }
         }
 
-        // 위치, 크기, 앞뒤 순서, 보임 여부를 적용합니다.
         ApplyTransformSettings();
         ApplyRendererSettings();
     }
 
-    // 현재 사용할 버블 Sprite를 고르는 함수입니다.
+    // 현재 사용할 버블을 고르는 함수입니다.
     private void SelectCurrentBubble()
     {
-        // Use Random Bubble이 켜져 있고 Sprite 목록이 있다면 랜덤으로 하나 고릅니다.
-        if (useRandomBubble && bubbleSprites != null && bubbleSprites.Length > 0)
+        // 코드로 만든 원형 버블을 사용하는 경우
+        if (useGeneratedCircleSprites)
         {
-            int randomIndex = Random.Range(0, bubbleSprites.Length);
-            selectedBubbleSprite = bubbleSprites[randomIndex];
+            Sprite[] circleSprites = GetGeneratedCircleSprites();
+            if (circleSprites != null && circleSprites.Length > 0)
+            {
+                if (useRandomBubble)
+                {
+                    selectedColorIndex = Random.Range(0, circleSprites.Length);
+                }
+                else
+                {
+                    selectedColorIndex = 0;
+                }
+                selectedBubbleSprite = circleSprites[selectedColorIndex];
+            }
             return;
         }
 
-        // 랜덤을 끈 상태라면 첫 번째 Sprite를 사용합니다.
-        // Current Bubble Sprite 필드는 초보자에게 헷갈릴 수 있어서 Inspector에서 제거했습니다.
+        // PNG Sprite를 사용하는 경우
+        if (useRandomBubble && bubbleSprites != null && bubbleSprites.Length > 0)
+        {
+            selectedColorIndex = Random.Range(0, bubbleSprites.Length);
+            selectedBubbleSprite = bubbleSprites[selectedColorIndex];
+            return;
+        }
+
         if (bubbleSprites != null && bubbleSprites.Length > 0)
         {
+            selectedColorIndex = 0;
             selectedBubbleSprite = bubbleSprites[0];
         }
     }
@@ -131,15 +155,18 @@ public class BubbleCurrentController : MonoBehaviour
 
         bubbleRenderer.sprite = selectedBubbleSprite;
 
-        // 색 랜덤 기능을 켜면 bubbleColors 목록 중 하나를 골라서 Sprite에 색을 입힙니다.
-        if (useRandomColor && bubbleColors != null && bubbleColors.Length > 0)
+        // 코드로 만든 원형 버블이면 색을 직접 입힙니다.
+        if (useGeneratedCircleSprites && bubbleColors != null && selectedColorIndex < bubbleColors.Length)
+        {
+            bubbleRenderer.color = bubbleColors[selectedColorIndex];
+        }
+        else if (useRandomColor && bubbleColors != null && bubbleColors.Length > 0)
         {
             int randomColorIndex = Random.Range(0, bubbleColors.Length);
             bubbleRenderer.color = bubbleColors[randomColorIndex];
         }
         else
         {
-            // 색 랜덤을 끄면 Sprite 원래 색이 보이도록 흰색을 사용합니다.
             bubbleRenderer.color = Color.white;
         }
     }
@@ -154,40 +181,29 @@ public class BubbleCurrentController : MonoBehaviour
 
         Transform bubbleTransform = bubbleRenderer.transform;
 
-        // 현재 버블 위치는 Inspector에서 수동으로 조절합니다.
-        // 단, 기준점은 ShooterRoot가 아니라 실제 슈터 그림인 ShooterVisual입니다.
-        // 이유: ShooterRoot의 기준점과 ShooterVisual 그림 위치가 서로 떨어져 있으면
-        // CurrentBubble이 슈터 바로 위가 아니라 옆이나 위쪽으로 비켜 보일 수 있기 때문입니다.
-        Vector3 shooterVisualLocalPosition = GetShooterVisualLocalPosition();
+        // 현재 버블은 ShooterVisual의 자식이므로, localPosition은 ShooterVisual 기준입니다.
+        // X는 좌우, Y는 위아래입니다.
+        bubbleTransform.localPosition = new Vector3(bubbleLocalPosition.x, bubbleLocalPosition.y, 0f);
 
-        // ShooterVisual 위치에 사용자가 입력한 오프셋을 더합니다.
-        // offset은 "기준 위치에서 얼마나 더 움직일지"라는 뜻입니다.
-        bubbleTransform.localPosition = shooterVisualLocalPosition + new Vector3(bubbleLocalPosition.x, bubbleLocalPosition.y, 0f);
+        // 크기를 결정합니다.
+        float finalScale = bubbleScale;
 
-        // localScale은 크기입니다.
-        // Vector3.one은 (1, 1, 1)을 뜻합니다.
-        bubbleTransform.localScale = Vector3.one * bubbleScale;
-    }
-
-    // ShooterVisual의 위치를 가져오는 함수입니다.
-    // ShooterVisual은 실제 슈터 그림이 들어있는 자식 오브젝트입니다.
-    private Vector3 GetShooterVisualLocalPosition()
-    {
-        // ShooterRoot 아래에서 ShooterVisual이라는 이름의 자식 오브젝트를 찾습니다.
-        Transform shooterVisual = transform.Find("ShooterVisual");
-
-        // ShooterVisual을 찾으면 그 localPosition을 기준점으로 사용합니다.
-        if (shooterVisual != null)
+        // 스테이지 버블과 같은 크기로 맞추는 옵션이 켜져 있으면 StageBubbleLayout에서 크기를 가져옵니다.
+        if (matchStageBubbleSize)
         {
-            return shooterVisual.localPosition;
+            StageBubbleLayout stageLayout = FindFirstObjectByType<StageBubbleLayout>();
+            if (stageLayout != null)
+            {
+                finalScale = stageLayout.GetBubbleDiameter();
+            }
         }
 
-        // ShooterVisual을 못 찾으면 기존처럼 ShooterRoot 기준점(Vector3.zero)을 사용합니다.
-        // Vector3.zero는 (0, 0, 0)을 뜻합니다.
-        return Vector3.zero;
+        bubbleTransform.localScale = Vector3.one * finalScale;
     }
 
-    // 현재 버블이 보이는지, 배경보다 앞에 있는지 설정하는 함수입니다.
+
+
+    // 현재 버블이 보이는지 설정하는 함수입니다.
     private void ApplyRendererSettings()
     {
         if (bubbleRenderer == null)
@@ -199,11 +215,99 @@ public class BubbleCurrentController : MonoBehaviour
         bubbleRenderer.sortingOrder = sortingOrder;
     }
 
-    // 나중에 발사 후 다음 버블을 현재 버블로 바꿀 때 사용할 수 있는 함수입니다.
-    // 기능 20번에서 다시 사용할 수 있습니다.
-    public void SetNextBubble()
+    // 코드로 빨강, 파랑, 노랑 원형 버블 Sprite를 만드는 함수입니다.
+    private Sprite[] GetGeneratedCircleSprites()
     {
-        SelectCurrentBubble();
+        if (generatedCircleSprites != null && generatedCircleSprites.Length == 3)
+        {
+            return generatedCircleSprites;
+        }
+
+        generatedCircleSprites = new[]
+        {
+            CreateCircleSprite(Color.red),
+            CreateCircleSprite(Color.blue),
+            CreateCircleSprite(Color.yellow)
+        };
+
+        return generatedCircleSprites;
+    }
+
+    // 단색 원형 Sprite를 만드는 함수입니다.
+    private Sprite CreateCircleSprite(Color circleColor)
+    {
+        int textureSize = 128;
+        Texture2D texture = new Texture2D(textureSize, textureSize);
+
+        float center = (textureSize - 1) / 2f;
+        float radius = textureSize * 0.46f;
+
+        for (int y = 0; y < textureSize; y++)
+        {
+            for (int x = 0; x < textureSize; x++)
+            {
+                float distanceX = x - center;
+                float distanceY = y - center;
+                float distanceFromCenter = Mathf.Sqrt(distanceX * distanceX + distanceY * distanceY);
+
+                if (distanceFromCenter <= radius)
+                {
+                    texture.SetPixel(x, y, circleColor);
+                }
+                else
+                {
+                    texture.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+
+        texture.Apply();
+
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, textureSize, textureSize),
+            new Vector2(0.5f, 0.5f),
+            textureSize
+        );
+    }
+
+    // 나중에 발사 후 다음 버블을 현재 버블로 바꿀 때 사용하는 함수입니다.
+    public void SetNextBubble(Sprite newSprite = null, int newColorIndex = -1)
+    {
+        if (newSprite != null)
+        {
+            selectedBubbleSprite = newSprite;
+
+            // 색 인덱스도 함께 업데이트합니다.
+            // newColorIndex가 0 이상이면 그 인덱스를 사용합니다.
+            if (newColorIndex >= 0)
+            {
+                selectedColorIndex = newColorIndex;
+            }
+        }
+        else
+        {
+            SelectCurrentBubble();
+        }
+
         ApplyBubbleVisual();
+    }
+
+    // 현재 선택된 버블 Sprite를 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    public Sprite GetSelectedBubbleSprite()
+    {
+        return selectedBubbleSprite;
+    }
+
+    // 현재 사용 중인 Bubble Sprites 목록을 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    public Sprite[] GetBubbleSprites()
+    {
+        return bubbleSprites;
+    }
+
+    // 코드로 만든 원형 버블의 색 인덱스를 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    public int GetSelectedColorIndex()
+    {
+        return selectedColorIndex;
     }
 }

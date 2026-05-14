@@ -1,11 +1,11 @@
-# 기능 19 프롬프트: 다음 버블 표시하기
+# 기능 20 프롬프트: 발사 후 다음 버블이 현재 버블로 바뀌기
 
 아래 프롬프트를 그대로 복사해서 사용하세요.
 
 ```text
 나는 초보자이고, Unity 6으로 2D 버블슈터 게임을 만들고 있어.
 
-이번에는 기능 목록 19번인 "다음 버블 표시"만 만들고 싶어.
+이번에는 기능 목록 20번인 "발사 후 다음 버블이 현재 버블로 바뀌기"만 만들고 싶어.
 
 참고 문서 위치:
 - C:\Users\admin\Documents\BubbleGame\BubbleShooter_Planning.md
@@ -19,39 +19,30 @@ Unity 프로젝트 폴더:
 - C:\Users\admin\Documents\BubbleGame\BubbleGame
 
 현재 상태:
-- 기능 1번~4번 배경 기능은 완료했어.
-- 기능 5번~8번 타이머 숫자/게이지 기능은 완료했어.
-- 기능 9번~11번 점수 기능은 완료했어.
-- 기능 12번 슈터 배치 기능은 완료했어.
-- 기능 13번 마우스/키보드 조준 기능은 완료했어.
-- 기능 14번 모바일 터치 조준은 패스했어.
-- 기능 15번 아래쪽 조준 제한 기능은 완료했어.
-- 기능 16번 조준선 표시 기능은 완료했어.
-- 기능 17번 조준선 벽 반사 기능은 완료했어.
-- 기능 18번 현재 버블 표시 기능은 완료했어.
+- 기능 1번~19번은 완료했어.
 - BubbleCurrentController.cs가 있고 ShooterRoot에 붙어 있어.
 - 현재 버블은 ShooterVisual 기준으로 슈터 위에 보여.
-- Bubble Local Position, Bubble Scale로 위치/크기를 수동 조절해.
-- Use Random Bubble 옵션으로 랜덤 버블을 고를 수 있어.
+- BubbleNextController.cs가 있고 ShooterRoot에 붙어 있어.
+- 다음 버블은 현재 버블 옆에 작게 보여.
+- 다음 버블은 현재 버블과 다른 색으로 랜덤 선택됨.
 - Bubble Sprites 배열에 빨강, 파랑, 노랑 이미지가 들어가 있어.
 - WallsRoot, LeftWall, RightWall, Ceiling 벽 오브젝트가 준비되어 있어.
-- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블 기능은 절대 망가뜨리지 말아줘.
+- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블, 다음 버블 기능은 절대 망가뜨리지 말아줘.
 - EventSystem은 삭제된 상태야. 이번 기능에는 필요 없으면 만들지 마.
 - 앞으로 자동 세팅 메뉴는 만들지 말고, 수동 세팅 방식으로 알려줘.
 
 목표:
-현재 버블 옆에 다음에 나올 버블을 작게 보여주고 싶어.
-지금 발사할 버블이 슈터 위에 보이는 것처럼, 다음 버블은 그 옆에 작게 보이면 돼.
+한 발 쏜 뒤에 다음 버블이 슈터 위의 현재 버블로 바뀌게 하고 싶어.
+지금은 버블 발사 기능(21번)은 아직 안 만들었지만, "다음 버블을 현재 버블로 바꾸는 로직"만 미리 준비하고 싶어.
 
 조건:
 - Unity 6 2D 프로젝트 기준으로 설명해줘.
-- 이번에는 기능 19번 "다음 버블 표시"만 만들어줘.
+- 이번에는 기능 20번 "다음 버블이 현재 버블로 바뀌기"만 만들어줘.
 - 버블 발사는 아직 만들지 마. 그건 기능 21번에서 만들 거야.
-- 다음 버블은 현재 버블 옆에 작게 보여야 해.
-- 다음 버블은 현재 버블보다 조금 작은 크기로 보여야 해.
-- 다음 버블은 배경보다 앞에 보여야 해.
-- 다음 버블은 마우스/키보드 조준 방향과 함께 회전하지 않아도 돼. (고정된 위치에 표시)
+- 기능 20번은 "바꾸기 로직"만 만들면 돼.
+- 나중에 기능 21번에서 버블을 쏠 때 이 바꾸기 로직을 호출하면 됩니다.
 - 기존 BubbleCurrentController.cs의 현재 버블 표시 기능은 유지해줘.
+- 기존 BubbleNextController.cs의 다음 버블 표시 기능은 유지해줘.
 - 기존 조준/조준선/배경/타이머/점수 기능은 유지해줘.
 - ShooterRoot 위치는 자동으로 바꾸지 마.
 - 기존 StageBackgroundController.cs, TimerController.cs, TimerGaugeController.cs, ScoreController.cs, ShooterAimController.cs, ShooterAimLineController.cs 등은 건드리지 마.
@@ -63,22 +54,24 @@ Unity 프로젝트 폴더:
 - Inspector에서 뭘 설정해야 하는지 알려줘.
 - 자주 틀리는 부분도 알려줘.
 
-다음 버블 표시 방식:
-- BubbleNextController.cs 같은 새 스크립트를 만들어줘.
-- BubbleNextController.cs는 ShooterRoot에 붙이는 방식으로 해줘.
-- 다음 버블 Sprite 목록은 Bubble Sprites 배열로 관리하게 해줘.
-- 다음 버블은 현재 버블과 다른 색이어야 해.
-- 다음 버블은 현재 버블보다 작은 크기로 보여야 해.
-- nextBubbleScale 변수로 다음 버블 크기를 Inspector에서 조절하게 해줘.
-- nextBubbleLocalPosition 변수로 다음 버블 위치를 Inspector에서 조절하게 해줘.
-- showNextBubble bool로 표시 여부를 관리하게 해줘.
-- sortingOrder로 배경보다 앞에 보이게 해줘.
+바꾸기 로직 방식:
+- BubbleSwapController.cs 같은 새 스크립트를 만들어줘.
+- BubbleSwapController.cs는 ShooterRoot에 붙이는 방식으로 해줘.
+- SwapBubbles() 함수를 만들어서 호출하면 다음 버블이 현재 버블로 바뀌게 해줘.
+- SwapBubbles() 안에서:
+  1. BubbleCurrentController의 SetNextBubble()을 호출해서 현재 버블 이미지를 새로 고칩니다.
+  2. BubbleNextController의 SelectNewNextBubble()을 호출해서 다음 버블 이미지를 새로 고칩니다.
+- 이렇게 하면 나중에 기능 21번에서 버블을 쏜 뒤에 SwapBubbles()를 한 번 호출하면 됩니다.
+- 테스트용으로 키보드 키를 누르면 SwapBubbles()가 실행되게 해줘.
+- 예: Space 키를 누르면 다음 버블이 현재 버블로 바뀌게 해줘.
+- Inspector에서 테스트 키를 켜고 끌 수 있게 해줘.
 
 코드 작성 조건:
-- BubbleNextController.cs를 새로 만들어줘.
-- 기존 BubbleCurrentController.cs는 가능하면 건드리지 마.
+- BubbleSwapController.cs를 새로 만들어줘.
+- 기존 BubbleCurrentController.cs는 가능한 건드리지 마.
+- 기존 BubbleNextController.cs는 가능한 건드리지 마.
 - Awake/Start에서 초기화해줘.
-- Update에서 필요시 갱신해줘.
+- Update에서 키 입력을 확인해줘.
 - [Header("한글 설명")]을 사용해줘.
 - [Tooltip("초보자용 설명")]도 한글로 추가해줘.
 - 변수 이름은 Unity/C# 규칙 때문에 영어로 유지해줘.
@@ -126,7 +119,7 @@ Unity 프로젝트 폴더:
 - 마지막에 내가 외워야 할 핵심만 짧게 뽑아줘.
 
 주의:
-- 이번에는 기능 19번만 만들어줘.
+- 이번에는 기능 20번만 만들어줘.
 - 버블 발사는 만들지 마.
 - ShooterRoot 위치를 자동으로 바꾸지 마.
 - 기존 배경, 타이머, 게이지, 점수 코드는 건드리지 마.
@@ -137,4 +130,4 @@ Unity 프로젝트 폴더:
 
 1. 위 `text` 박스 안의 내용을 전부 복사합니다.
 2. 다음 작업 요청으로 그대로 붙여넣습니다.
-3. 기능 19번이 성공하면 다음에는 기능 20번 프롬프트를 만들면 됩니다.
+3. 기능 20번이 성공하면 다음에는 기능 21번 프롬프트를 만들면 됩니다.

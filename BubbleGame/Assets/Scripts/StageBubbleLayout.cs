@@ -467,6 +467,29 @@ public class StageBubbleLayout : MonoBehaviour
             textureSize
         );
     }
+
+    // 스테이지 버블의 실제 크기를 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    // BubbleCurrentController가 이 함수를 사용해서 스테이지 버블과 같은 크기를 맞춥니다.
+    public float GetBubbleDiameter()
+    {
+        // 벽 안쪽 너비를 계산합니다.
+        Transform leftWall = transform.Find("LeftWall");
+        Transform rightWall = transform.Find("RightWall");
+
+        if (leftWall == null || rightWall == null)
+        {
+            return bubbleVisualScale;
+        }
+
+        float leftX = transform.InverseTransformPoint(GetWorldBounds(leftWall).max).x + horizontalPadding;
+        float rightX = transform.InverseTransformPoint(GetWorldBounds(rightWall).min).x - horizontalPadding;
+        float availableWidth = Mathf.Max(rightX - leftX, bubbleSpacing);
+        float spacingToFit = cols > 0 ? availableWidth / cols : availableWidth;
+        float finalSpacing = spacingToFit;
+        float finalBubbleDiameter = finalSpacing * Mathf.Clamp(bubbleVisualScale, 0.1f, 1.3f);
+
+        return finalBubbleDiameter;
+    }
 }
 
 #if UNITY_EDITOR

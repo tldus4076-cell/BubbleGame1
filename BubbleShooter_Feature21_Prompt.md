@@ -1,11 +1,11 @@
-# 기능 19 프롬프트: 다음 버블 표시하기
+# 기능 21 프롬프트: 버블 발사하기
 
 아래 프롬프트를 그대로 복사해서 사용하세요.
 
 ```text
 나는 초보자이고, Unity 6으로 2D 버블슈터 게임을 만들고 있어.
 
-이번에는 기능 목록 19번인 "다음 버블 표시"만 만들고 싶어.
+이번에는 기능 목록 21번인 "버블 발사"만 만들고 싶어.
 
 참고 문서 위치:
 - C:\Users\admin\Documents\BubbleGame\BubbleShooter_Planning.md
@@ -19,39 +19,34 @@ Unity 프로젝트 폴더:
 - C:\Users\admin\Documents\BubbleGame\BubbleGame
 
 현재 상태:
-- 기능 1번~4번 배경 기능은 완료했어.
-- 기능 5번~8번 타이머 숫자/게이지 기능은 완료했어.
-- 기능 9번~11번 점수 기능은 완료했어.
-- 기능 12번 슈터 배치 기능은 완료했어.
-- 기능 13번 마우스/키보드 조준 기능은 완료했어.
-- 기능 14번 모바일 터치 조준은 패스했어.
-- 기능 15번 아래쪽 조준 제한 기능은 완료했어.
-- 기능 16번 조준선 표시 기능은 완료했어.
-- 기능 17번 조준선 벽 반사 기능은 완료했어.
-- 기능 18번 현재 버블 표시 기능은 완료했어.
+- 기능 1번~20번은 완료했어.
 - BubbleCurrentController.cs가 있고 ShooterRoot에 붙어 있어.
 - 현재 버블은 ShooterVisual 기준으로 슈터 위에 보여.
-- Bubble Local Position, Bubble Scale로 위치/크기를 수동 조절해.
-- Use Random Bubble 옵션으로 랜덤 버블을 고를 수 있어.
+- BubbleNextController.cs가 있고 다음 버블은 현재 버블 옆에 작게 보여.
+- BubbleSwapController.cs가 있고 Space 키로 다음 버블을 현재 버블로 바꿀 수 있어.
+- ShooterAimController.cs가 있고 슈터가 마우스/키보드로 조준해.
+- ShooterAimLineController.cs가 있고 조준선이 벽에 닿으면 꺾여서 보여.
+- WallsRoot, LeftWall, RightWall, Ceiling 벽 오브젝트가 준비되어 있고 BoxCollider2D가 붙어 있어.
 - Bubble Sprites 배열에 빨강, 파랑, 노랑 이미지가 들어가 있어.
-- WallsRoot, LeftWall, RightWall, Ceiling 벽 오브젝트가 준비되어 있어.
-- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블 기능은 절대 망가뜨리지 말아줘.
+- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블, 다음 버블, 바꾸기 기능은 절대 망가뜨리지 말아줘.
 - EventSystem은 삭제된 상태야. 이번 기능에는 필요 없으면 만들지 마.
 - 앞으로 자동 세팅 메뉴는 만들지 말고, 수동 세팅 방식으로 알려줘.
 
 목표:
-현재 버블 옆에 다음에 나올 버블을 작게 보여주고 싶어.
-지금 발사할 버블이 슈터 위에 보이는 것처럼, 다음 버블은 그 옆에 작게 보이면 돼.
+마우스 왼쪽 버튼을 클릭하면 현재 버블이 조준 방향으로 날아가게 하고 싶어.
+버블이 벽에 닿으면 반사되고, 다른 버블이나 천장에 닿으면 멈추게 하고 싶어.
 
 조건:
 - Unity 6 2D 프로젝트 기준으로 설명해줘.
-- 이번에는 기능 19번 "다음 버블 표시"만 만들어줘.
-- 버블 발사는 아직 만들지 마. 그건 기능 21번에서 만들 거야.
-- 다음 버블은 현재 버블 옆에 작게 보여야 해.
-- 다음 버블은 현재 버블보다 조금 작은 크기로 보여야 해.
-- 다음 버블은 배경보다 앞에 보여야 해.
-- 다음 버블은 마우스/키보드 조준 방향과 함께 회전하지 않아도 돼. (고정된 위치에 표시)
-- 기존 BubbleCurrentController.cs의 현재 버블 표시 기능은 유지해줘.
+- 이번에는 기능 21번 "버블 발사"만 만들어줘.
+- 버블 발사 후 매칭(3개 이상 같은 색 제거)은 아직 만들지 마. 그건 기능 31번~34번에서 만들 거야.
+- 연결 끊긴 버블 떨어뜨리기도 아직 만들지 마. 그건 기능 37번~39번에서 만들 거야.
+- 마우스 왼쪽 버튼을 클릭하면 현재 버블이 조준 방향으로 날아가게 해줘.
+- 발사된 버블은 Rigidbody2D와 Collider2D를 사용해서 물리적으로 움직이게 해줘.
+- 발사된 버블은 벽(WallsRoot 안의 LeftWall, RightWall, Ceiling)에 닿으면 반사돼야 해.
+- 발사된 버블은 스테이지에 있는 버블(StageBubbleLayout이 만든 버블)에 닿으면 그 자리에 멈춰야 해.
+- 발사된 버블은 천장(Ceiling)에 닿으면 그 자리에 멈춰야 해.
+- 발사 후에는 BubbleSwapController의 SwapBubbles()를 호출해서 다음 버블을 현재 버블로 바꿔야 해.
 - 기존 조준/조준선/배경/타이머/점수 기능은 유지해줘.
 - ShooterRoot 위치는 자동으로 바꾸지 마.
 - 기존 StageBackgroundController.cs, TimerController.cs, TimerGaugeController.cs, ScoreController.cs, ShooterAimController.cs, ShooterAimLineController.cs 등은 건드리지 마.
@@ -63,22 +58,35 @@ Unity 프로젝트 폴더:
 - Inspector에서 뭘 설정해야 하는지 알려줘.
 - 자주 틀리는 부분도 알려줘.
 
-다음 버블 표시 방식:
-- BubbleNextController.cs 같은 새 스크립트를 만들어줘.
-- BubbleNextController.cs는 ShooterRoot에 붙이는 방식으로 해줘.
-- 다음 버블 Sprite 목록은 Bubble Sprites 배열로 관리하게 해줘.
-- 다음 버블은 현재 버블과 다른 색이어야 해.
-- 다음 버블은 현재 버블보다 작은 크기로 보여야 해.
-- nextBubbleScale 변수로 다음 버블 크기를 Inspector에서 조절하게 해줘.
-- nextBubbleLocalPosition 변수로 다음 버블 위치를 Inspector에서 조절하게 해줘.
-- showNextBubble bool로 표시 여부를 관리하게 해줘.
-- sortingOrder로 배경보다 앞에 보이게 해줘.
+버블 발사 방식:
+- BubbleLauncherController.cs 같은 새 스크립트를 만들어줘.
+- BubbleLauncherController.cs는 ShooterRoot에 붙이는 방식으로 해줘.
+- 마우스 왼쪽 버튼을 클릭하면 현재 버블을 발사하게 해줘.
+- 발사할 때 현재 버블의 Sprite와 색을 복사해서 새 GameObject를 만들어줘.
+- 새 GameObject에는 Rigidbody2D를 붙여서 물리적으로 움직이게 해줘.
+- 새 GameObject에는 CircleCollider2D를 붙여서 충돌 감지를 하게 해줘.
+- 발사 방향은 ShooterAimController의 조준 방향을 사용해줘.
+- 발사 속도는 launchSpeed 변수로 Inspector에서 조절하게 해줘.
+- 발사 후에는 BubbleSwapController의 SwapBubbles()를 호출해서 다음 버블을 현재 버블로 바꿔줘.
+
+벽 반사 조건:
+- 발사된 버블이 LeftWall이나 RightWall에 닿으면 반사돼야 해.
+- Rigidbody2D의 Velocity를 사용해서 반사 방향을 계산해줘.
+- 또는 Physics Material 2D를 사용해서 벽 반사를 구현해도 돼.
+
+멈춤 조건:
+- 발사된 버블이 Ceiling에 닿으면 그 자리에 멈춰야 해.
+- 발사된 버블이 스테이지 버블에 닿으면 그 자리에 멈춰야 해.
+- 멈춘 뒤에는 Rigidbody2D를 비활성화하거나 Velocity를 0으로 만들어줘.
+- 멈춘 버블은 나중에 매칭/제거 기능에서 사용할 수 있도록 StageBubbleLayout의 자식으로 넣어줘.
 
 코드 작성 조건:
-- BubbleNextController.cs를 새로 만들어줘.
-- 기존 BubbleCurrentController.cs는 가능하면 건드리지 마.
+- BubbleLauncherController.cs를 새로 만들어줘.
+- 기존 BubbleCurrentController.cs는 가능한 건드리지 마.
+- 기존 BubbleNextController.cs는 가능한 건드리지 마.
+- 기존 BubbleSwapController.cs는 가능한 건드리지 마.
 - Awake/Start에서 초기화해줘.
-- Update에서 필요시 갱신해줘.
+- Update에서 마우스 입력을 확인해줘.
 - [Header("한글 설명")]을 사용해줘.
 - [Tooltip("초보자용 설명")]도 한글로 추가해줘.
 - 변수 이름은 Unity/C# 규칙 때문에 영어로 유지해줘.
@@ -126,8 +134,9 @@ Unity 프로젝트 폴더:
 - 마지막에 내가 외워야 할 핵심만 짧게 뽑아줘.
 
 주의:
-- 이번에는 기능 19번만 만들어줘.
-- 버블 발사는 만들지 마.
+- 이번에는 기능 21번만 만들어줘.
+- 매칭/제거 기능은 만들지 마.
+- 연결 끊긴 버블 떨어뜨리기도 만들지 마.
 - ShooterRoot 위치를 자동으로 바꾸지 마.
 - 기존 배경, 타이머, 게이지, 점수 코드는 건드리지 마.
 - EventSystem은 다시 만들지 마.
@@ -137,4 +146,4 @@ Unity 프로젝트 폴더:
 
 1. 위 `text` 박스 안의 내용을 전부 복사합니다.
 2. 다음 작업 요청으로 그대로 붙여넣습니다.
-3. 기능 19번이 성공하면 다음에는 기능 20번 프롬프트를 만들면 됩니다.
+3. 기능 21번이 성공하면 다음에는 기능 22번 프롬프트를 만들면 됩니다.
