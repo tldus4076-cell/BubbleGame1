@@ -63,6 +63,15 @@ public class BubbleLauncherController : MonoBehaviour
     // ============================================
     // Awake 함수
     // 게임이 시작될 때 Start보다 먼저 한 번 호출됩니다.
+
+    // 발사 후 다시 발사할 수 있을 때까지 기다리는 시간입니다.
+    // 이렇게 해야 버블이 멈춘 직후에 바로 새 버블이 발사되지 않습니다.
+    private float launchCooldown = 0.2f;
+
+    // 마지막으로 발사한 시간을 기록합니다.
+    private float lastLaunchTime = -1f;
+
+    // Awake는 Start보다 먼저 한 번 호출됩니다.
     // 여기서는 필요한 스크립트 연결을 준비합니다.
     // ============================================
     private void Awake()
@@ -117,6 +126,13 @@ public class BubbleLauncherController : MonoBehaviour
         // return을 하면 이 함수를 즉시 끝내겠다는 뜻입니다.
         // 이렇게 해야 한 번에 하나만 발사됩니다.
         if (isLaunching)
+        {
+            return;
+        }
+
+        // 마지막 발사 후 쿨다운 시간이 지나지 않았으면 발사하지 않습니다.
+        // 이렇게 해야 버블이 멈춘 직후에 바로 새 버블이 발사되지 않습니다.
+        if (Time.time - lastLaunchTime < launchCooldown)
         {
             return;
         }
@@ -184,6 +200,9 @@ public class BubbleLauncherController : MonoBehaviour
         // 이제부터 TryLaunchBubble에서 return이 되어서 새 버블이 발사되지 않습니다.
         isLaunching = true;
 
+        // 발사 시간을 기록합니다.
+        lastLaunchTime = Time.time;
+
         // 현재 버블의 SpriteRenderer를 가져옵니다.
         // CurrentBubble은 ShooterVisual의 자식이므로, ShooterVisual 아래에서 찾습니다.
         Transform shooterVisual = transform.Find("ShooterVisual");
@@ -208,6 +227,10 @@ public class BubbleLauncherController : MonoBehaviour
         // 이 오브젝트는 ShooterRoot와 완전히 별개입니다.
         GameObject launchedBubble = new GameObject("LaunchedBubble");
 
+        // 발사된 버블을 Default 레이어(0번)로 설정합니다.
+        // 이렇게 해야 스테이지 버블(레이어 2번)과 충돌 감지가 됩니다.
+        launchedBubble.layer = 0;
+
         // 슈터 위치에서 발사합니다.
         launchedBubble.transform.position = currentBubbleTransform.position;
 
@@ -231,6 +254,10 @@ public class BubbleLauncherController : MonoBehaviour
 
         // 회전을 막습니다. 버블이 회전하지 않게 합니다.
         rb.freezeRotation = true;
+
+        // 연속 충돌 감지를 설정합니다.
+        // 이렇게 해야 빠른 속도로 날아가는 버블이 스테이지 버블을 통과하지 않습니다.
+        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
         // CircleCollider2D를 붙여서 충돌 감지를 합니다.
         CircleCollider2D circleCollider = launchedBubble.AddComponent<CircleCollider2D>();
@@ -272,15 +299,10 @@ public class BubbleLauncherController : MonoBehaviour
         // 이제 TryLaunchBubble에서 return이 안 되어서 새 버블을 발사할 수 있습니다.
         isLaunching = false;
 
-        // 멈춘 버블의 Rigidbody2D를 제거합니다.
-        Rigidbody2D rb = stoppedBubble.GetComponent<Rigidbody2D>();
-        if (rb != null)
-        {
-            Object.Destroy(rb);
-        }
+        // 쿨다운 시간을 다시 기록합니다.
+        lastLaunchTime = Time.time;
 
         // 멈춘 버블의 Collider를 제거합니다.
-        // 나중에 매칭/제거 기능에서 다시 설정할 수 있습니다.
         CircleCollider2D collider = stoppedBubble.GetComponent<CircleCollider2D>();
         if (collider != null)
         {
@@ -288,7 +310,6 @@ public class BubbleLauncherController : MonoBehaviour
         }
 
         // 멈춘 버블을 StageBubbleLayout의 자식으로 넣습니다.
-        // 이렇게 하면 나중에 매칭/제거 기능에서 스테이지 버블과 함께 처리할 수 있습니다.
         if (stageBubbleLayout != null)
         {
             stoppedBubble.transform.SetParent(stageBubbleLayout.transform);
@@ -324,6 +345,13 @@ public class BubbleCollisionHandler : MonoBehaviour
     // 충돌이 아주 빠르게 여러 번 들어와도 SwapBubbles()가 여러 번 실행되지 않게 막습니다.
     private bool hasStopped = false;
 
+    // 스폰 직후 충돌을 무시하기 위한 타이머입니다.
+    private float spawnTime;
+    private const float IgnoreCollisionAfterSpawn = 0.3f;
+
+    // 감지 반지름입니다. 버블 크기와 비슷하게 설정합니다.
+    private float detectionRadius = 0.3f;
+
     // ============================================
     // Initialize 함수
     // BubbleLauncherController에서 호출합니다.
@@ -333,40 +361,52 @@ public class BubbleCollisionHandler : MonoBehaviour
     {
         launcher = launcherController;
         stageBubbleLayout = layout;
+        spawnTime = Time.time;
+
+        // 발사된 버블의 크기에 맞게 감지 반지름을 설정합니다.
+        float localScale = transform.localScale.x;
+        detectionRadius = localScale * 0.5f;
     }
 
-    // ============================================
-    // OnCollisionEnter2D 함수
-    // 2D 물리 충돌이 시작될 때 Unity가 자동으로 호출합니다.
-    // Collision2D는 "충돌 정보"입니다.
-    // ============================================
-    private void OnCollisionEnter2D(Collision2D collision)
+    // Update는 매 프레임 호출됩니다.
+    // 여기서 Physics2D.OverlapCircle로 스테이지 버블을 감지합니다.
+    private void Update()
     {
-        // 충돌한 오브젝트의 이름을 가져옵니다.
-        string collidedName = collision.gameObject.name;
-
-        // 천장에 닿았는지 확인합니다.
-        if (collidedName == "Ceiling")
+        // 스폰 직후에는 감지하지 않습니다.
+        if (Time.time - spawnTime < IgnoreCollisionAfterSpawn)
         {
-            StopBubble();
             return;
         }
 
-        // 스테이지 버블에 닿았는지 확인합니다.
-        // 스테이지 버블의 이름은 "Bubble_0_0", "Bubble_0_1" 같은 형식입니다.
-        if (collidedName.StartsWith("Bubble_"))
+        // 현재 버블 위치에서 감지 반지름 안에 있는 Collider2D를 찾습니다.
+        // ~0은 "모든 레이어를 감지한다"는 뜻입니다.
+        Collider2D[] hitColliders = Physics2D.OverlapCircleAll(transform.position, detectionRadius, ~0);
+
+        for (int i = 0; i < hitColliders.Length; i++)
         {
-            StopBubble();
-            return;
+            Collider2D hitCollider = hitColliders[i];
+
+            // 스테이지 버블에 닿았는지 확인합니다.
+            if (hitCollider.gameObject.name.StartsWith("Bubble_"))
+            {
+                StopBubble(hitCollider.gameObject);
+                return;
+            }
+
+            // 천장에 닿았는지 확인합니다.
+            if (hitCollider.gameObject.name == "Ceiling")
+            {
+                StopBubble(null);
+                return;
+            }
         }
     }
 
     // ============================================
     // StopBubble 함수
     // 버블을 멈추는 함수입니다.
-    // OnCollisionEnter2D에서 천장 또는 스테이지 버블에 닿았을 때 호출됩니다.
-    // ============================================
-    private void StopBubble()
+    // Update에서 천장 또는 스테이지 버블에 닿았을 때 호출됩니다.
+    private void StopBubble(GameObject hitBubble)
     {
         // ============================================
         // 기능 24번 안전장치: 이미 멈춘 버블이면 다시 처리하지 않습니다.
@@ -389,6 +429,19 @@ public class BubbleCollisionHandler : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
             rb.bodyType = RigidbodyType2D.Static;
+        }
+
+        // 충돌한 스테이지 버블이 있으면 아래쪽에 배치합니다.
+        if (hitBubble != null)
+        {
+            StageBubbleLayout layout = hitBubble.GetComponentInParent<StageBubbleLayout>();
+            if (layout != null)
+            {
+                float bubbleDiameter = layout.GetBubbleDiameter();
+                Vector3 snapPosition = hitBubble.transform.position;
+                snapPosition.y -= bubbleDiameter;
+                transform.position = snapPosition;
+            }
         }
 
         // BubbleLauncherController에게 버블이 멈췄다고 알립니다.

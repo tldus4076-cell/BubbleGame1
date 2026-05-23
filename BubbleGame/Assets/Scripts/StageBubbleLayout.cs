@@ -333,6 +333,21 @@ public class StageBubbleLayout : MonoBehaviour
                 // 숫자가 클수록 더 앞에 보입니다.
                 spriteRenderer.sortingOrder = 1;
 
+                // CircleCollider2D를 붙여서 충돌 감지를 합니다.
+                // 이렇게 해야 나중에 발사된 버블이 스테이지 버블에 닿으면 멈춥니다.
+                CircleCollider2D bubbleCollider = bubble.AddComponent<CircleCollider2D>();
+
+                // Collider 크기를 finalBubbleDiameter에 맞게 설정합니다.
+                bubbleCollider.radius = 0.5f;
+
+                // isTrigger를 true로 설정하면 물리적 충돌 없이 감지만 합니다.
+                // 이렇게 해야 조준선 Raycast에 영향을 주지 않습니다.
+                bubbleCollider.isTrigger = true;
+
+                // 스테이지 버블을 "Ignore Raycast" 레이어(2번)로 설정합니다.
+                // 이렇게 해야 조준선이 스테이지 버블을 무시합니다.
+                bubble.layer = 2;
+
 #if UNITY_EDITOR
                 // 플레이 전에는 Game 창에서만 보이고 Scene 창에서는 안 보이게 하기 위한 컴포넌트입니다.
                 if (!Application.isPlaying)
