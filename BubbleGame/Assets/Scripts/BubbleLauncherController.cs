@@ -1,11 +1,22 @@
 using UnityEngine;
 
+// ============================================
+// BubbleLauncherController.cs
+// 이 스크립트는 버블 발사 기능을 담당합니다.
+// 마우스 왼쪽 클릭 또는 Space 키로 버블을 발사합니다.
+// 기능 21번(발사), 23번(속도), 24번(한 번에 하나만)을 포함합니다.
+// ============================================
+
 // BubbleLauncherController는 "버블 발사"를 담당하는 스크립트입니다.
 // 마우스 왼쪽 버튼을 클릭하면 현재 버블을 조준 방향으로 발사합니다.
 // 발사된 버블은 벽에 닿으면 반사되고, 천장이나 스테이지 버블에 닿으면 멈춥니다.
 // 이 스크립트는 ShooterRoot 오브젝트에 붙여서 사용합니다.
 public class BubbleLauncherController : MonoBehaviour
 {
+    // ============================================
+    // 인스펙터에서 설정하는 변수들
+    // ============================================
+
     [Header("발사 속도 설정")]
     [Tooltip("버블이 날아가는 속도입니다. 숫자가 클수록 빠르게 날아갑니다.")]
     [SerializeField] private float launchSpeed = 10f;
@@ -21,6 +32,11 @@ public class BubbleLauncherController : MonoBehaviour
     [Tooltip("체크하면 마우스 클릭 대신 Space 키로도 발사할 수 있습니다.")]
     [SerializeField] private bool useSpaceKeyToLaunch = false;
 
+    // ============================================
+    // 코드 안에서 사용하는 변수들
+    // 인스펙터에 보이지 않습니다.
+    // ============================================
+
     // BubbleCurrentController는 "현재 발사할 버블"을 보여주는 스크립트입니다.
     private BubbleCurrentController currentController;
 
@@ -34,12 +50,21 @@ public class BubbleLauncherController : MonoBehaviour
     // 멈춘 버블을 스테이지 버블 자식으로 넣을 때 사용합니다.
     private StageBubbleLayout stageBubbleLayout;
 
+    // ============================================
+    // 기능 24번: 한 번에 하나만 발사하기
+    // ============================================
+
     // 지금 발사된 버블이 날아가는 중인지 확인하는 변수입니다.
+    // true = 버블이 날아가는 중, 새 버블 발사 불가
+    // false = 발사 준비 완료, 새 버블 발사 가능
     // 한 번에 하나만 발사해야 하기 때문에 사용합니다.
     private bool isLaunching = false;
 
-    // Awake는 Start보다 먼저 한 번 호출됩니다.
+    // ============================================
+    // Awake 함수
+    // 게임이 시작될 때 Start보다 먼저 한 번 호출됩니다.
     // 여기서는 필요한 스크립트 연결을 준비합니다.
+    // ============================================
     private void Awake()
     {
         // ShooterRoot에 붙어 있는 스크립트들을 찾습니다.
@@ -57,8 +82,11 @@ public class BubbleLauncherController : MonoBehaviour
         stageBubbleLayout = FindFirstObjectByType<StageBubbleLayout>();
     }
 
-    // Update는 매 프레임 호출됩니다.
+    // ============================================
+    // Update 함수
+    // 매 프레임 호출됩니다.
     // 여기서는 마우스 입력을 확인해서 버블을 발사합니다.
+    // ============================================
     private void Update()
     {
         // 마우스 왼쪽 버튼을 클릭했는지 확인합니다.
@@ -74,10 +102,19 @@ public class BubbleLauncherController : MonoBehaviour
         }
     }
 
+    // ============================================
+    // TryLaunchBubble 함수
     // 버블을 발사하려고 시도하는 함수입니다.
+    // 이 함수는 Update에서 마우스 클릭 또는 Space 키를 누를 때 호출됩니다.
+    // ============================================
     private void TryLaunchBubble()
     {
+        // ============================================
+        // 기능 24번 핵심: 한 번에 하나만 발사하기
+        // ============================================
         // 이미 발사된 버블이 날아가는 중이면 새 버블을 발사하지 않습니다.
+        // isLaunching이 true라는 뜻은 아직 날아가는 버블이 있다는 뜻입니다.
+        // return을 하면 이 함수를 즉시 끝내겠다는 뜻입니다.
         // 이렇게 해야 한 번에 하나만 발사됩니다.
         if (isLaunching)
         {
@@ -94,6 +131,8 @@ public class BubbleLauncherController : MonoBehaviour
         Vector2 launchDirection = GetLaunchDirection();
 
         // 조준 방향이 너무 작으면 발사하지 않습니다.
+        // sqrMagnitude는 벡터의 길이를 제곱한 값입니다.
+        // 0에 가까우면 아무 방향도 아니라는 뜻입니다.
         if (launchDirection.sqrMagnitude < 0.001f)
         {
             return;
@@ -103,7 +142,11 @@ public class BubbleLauncherController : MonoBehaviour
         LaunchBubble(launchDirection);
     }
 
+    // ============================================
+    // GetLaunchDirection 함수
     // 조준 방향을 가져오는 함수입니다.
+    // 이 함수는 TryLaunchBubble에서 호출됩니다.
+    // ============================================
     private Vector2 GetLaunchDirection()
     {
         // ShooterAimController가 있으면 조준 방향을 가져옵니다.
@@ -127,10 +170,18 @@ public class BubbleLauncherController : MonoBehaviour
         return Vector2.up;
     }
 
+    // ============================================
+    // LaunchBubble 함수
     // 실제 버블을 발사하는 함수입니다.
+    // 이 함수는 TryLaunchBubble에서 호출됩니다.
+    // ============================================
     private void LaunchBubble(Vector2 direction)
     {
-        // 발사 중으로 표시합니다.
+        // ============================================
+        // 기능 24번 핵심: 발사 중 상태로 변경
+        // ============================================
+        // 버블을 발사하는 순간 isLaunching을 true로 바꿉니다.
+        // 이제부터 TryLaunchBubble에서 return이 되어서 새 버블이 발사되지 않습니다.
         isLaunching = true;
 
         // 현재 버블의 SpriteRenderer를 가져옵니다.
@@ -140,6 +191,7 @@ public class BubbleLauncherController : MonoBehaviour
         Transform currentBubbleTransform = parentForBubble.Find("CurrentBubble");
         if (currentBubbleTransform == null)
         {
+            // CurrentBubble이 없으면 발사 취소하고 다시 발사 가능하게 합니다.
             isLaunching = false;
             return;
         }
@@ -147,6 +199,7 @@ public class BubbleLauncherController : MonoBehaviour
         SpriteRenderer currentRenderer = currentBubbleTransform.GetComponent<SpriteRenderer>();
         if (currentRenderer == null || currentRenderer.sprite == null)
         {
+            // Sprite가 없으면 발사 취소하고 다시 발사 가능하게 합니다.
             isLaunching = false;
             return;
         }
@@ -205,11 +258,18 @@ public class BubbleLauncherController : MonoBehaviour
         collisionHandler.Initialize(this, stageBubbleLayout);
     }
 
+    // ============================================
+    // OnBubbleStopped 함수
     // 발사된 버블이 멈출 때 호출되는 함수입니다.
     // BubbleCollisionHandler에서 호출합니다.
+    // ============================================
     public void OnBubbleStopped(GameObject stoppedBubble)
     {
-        // 발사 중 상태를 해제합니다.
+        // ============================================
+        // 기능 24번 핵심: 발사 중 상태 해제
+        // ============================================
+        // 버블이 멈췄으므로 isLaunching을 false로 바꿉니다.
+        // 이제 TryLaunchBubble에서 return이 안 되어서 새 버블을 발사할 수 있습니다.
         isLaunching = false;
 
         // 멈춘 버블의 Rigidbody2D를 제거합니다.
@@ -242,8 +302,11 @@ public class BubbleLauncherController : MonoBehaviour
     }
 }
 
-// BubbleCollisionHandler는 발사된 버블의 충돌을 감지하는 보조 스크립트입니다.
+// ============================================
+// BubbleCollisionHandler 클래스
+// 발사된 버블의 충돌을 감지하는 보조 스크립트입니다.
 // OnCollisionEnter2D는 "2D 물리 충돌이 시작될 때" Unity가 자동으로 호출합니다.
+// ============================================
 public class BubbleCollisionHandler : MonoBehaviour
 {
     // BubbleLauncherController의 OnBubbleStopped를 호출하기 위한 연결입니다.
@@ -252,15 +315,31 @@ public class BubbleCollisionHandler : MonoBehaviour
     // StageBubbleLayout은 멈춘 버블을 자식으로 넣을 때 사용합니다.
     private StageBubbleLayout stageBubbleLayout;
 
-    // 초기화 함수입니다. BubbleLauncherController에서 호출합니다.
+    // ============================================
+    // 기능 24번 안전장치: 중복 멈춤 방지
+    // ============================================
+    // 이 버블이 이미 멈춤 처리되었는지 기억하는 변수입니다.
+    // true = 이미 멈춤 처리됨, 다시 처리하지 않음
+    // false = 아직 멈춤 처리 안 됨
+    // 충돌이 아주 빠르게 여러 번 들어와도 SwapBubbles()가 여러 번 실행되지 않게 막습니다.
+    private bool hasStopped = false;
+
+    // ============================================
+    // Initialize 함수
+    // BubbleLauncherController에서 호출합니다.
+    // 이 함수는 LaunchBubble에서 발사 직후에 한 번 호출됩니다.
+    // ============================================
     public void Initialize(BubbleLauncherController launcherController, StageBubbleLayout layout)
     {
         launcher = launcherController;
         stageBubbleLayout = layout;
     }
 
-    // OnCollisionEnter2D는 2D 물리 충돌이 시작될 때 Unity가 자동으로 호출합니다.
+    // ============================================
+    // OnCollisionEnter2D 함수
+    // 2D 물리 충돌이 시작될 때 Unity가 자동으로 호출합니다.
     // Collision2D는 "충돌 정보"입니다.
+    // ============================================
     private void OnCollisionEnter2D(Collision2D collision)
     {
         // 충돌한 오브젝트의 이름을 가져옵니다.
@@ -282,9 +361,27 @@ public class BubbleCollisionHandler : MonoBehaviour
         }
     }
 
+    // ============================================
+    // StopBubble 함수
     // 버블을 멈추는 함수입니다.
+    // OnCollisionEnter2D에서 천장 또는 스테이지 버블에 닿았을 때 호출됩니다.
+    // ============================================
     private void StopBubble()
     {
+        // ============================================
+        // 기능 24번 안전장치: 이미 멈춘 버블이면 다시 처리하지 않습니다.
+        // ============================================
+        // 이렇게 해야 한 발을 쐈을 때 다음 버블 바꾸기가 한 번만 실행됩니다.
+        // 예: 버블이 천장에 닿는 순간 Collider가 여러 개 동시에 감지될 수 있습니다.
+        // 그때 StopBubble이 여러 번 호출될 수 있는데, hasStopped가 true면 무시합니다.
+        if (hasStopped)
+        {
+            return;
+        }
+
+        // 지금부터 이 버블은 멈춘 상태라고 표시합니다.
+        hasStopped = true;
+
         // Rigidbody2D를 가져와서 속도를 0으로 만듭니다.
         Rigidbody2D rb = GetComponent<Rigidbody2D>();
         if (rb != null)
@@ -295,6 +392,7 @@ public class BubbleCollisionHandler : MonoBehaviour
         }
 
         // BubbleLauncherController에게 버블이 멈췄다고 알립니다.
+        // OnBubbleStopped가 호출되면 isLaunching이 false가 됩니다.
         if (launcher != null)
         {
             launcher.OnBubbleStopped(gameObject);

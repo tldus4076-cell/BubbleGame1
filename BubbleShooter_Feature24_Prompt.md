@@ -8,15 +8,15 @@
 이번에는 기능 목록 24번인 "한 번에 하나만 발사"만 만들고 싶어.
 
 참고 문서 위치:
-- C:\Users\admin\Documents\BubbleGame\BubbleShooter_Planning.md
-- C:\Users\admin\Documents\BubbleGame\BubbleShooter_StagePlan.md
-- C:\Users\admin\Documents\BubbleGame\BubbleShooter_FeatureList.md
+- C:\Users\cum\OneDrive\문서\BubbleGame1\Docs\BubbleShooter_FeatureList.md
+- C:\Users\cum\OneDrive\문서\BubbleGame1\Docs\BubbleShooter_Planning.md
+- C:\Users\cum\OneDrive\문서\BubbleGame1\Docs\BubbleShooter_StagePlan.md
 
 작업 폴더:
-- C:\Users\admin\Documents\BubbleGame
+- C:\Users\cum\OneDrive\문서\BubbleGame1
 
 Unity 프로젝트 폴더:
-- C:\Users\admin\Documents\BubbleGame\BubbleGame
+- C:\Users\cum\OneDrive\문서\BubbleGame1\BubbleGame
 
 현재 상태:
 - 기능 1번~23번은 완료했어. (22번 모바일 터치는 패스)
@@ -42,11 +42,22 @@ Unity 프로젝트 폴더:
 - ShooterRoot 위치는 자동으로 바꾸지 마.
 - 초보자도 이해할 수 있게 쉬운 말로 설명해줘.
 - 코드마다 주석을 초보자도 알아보기 쉽게 달아줘.
+- [Header("한글 설명")]을 사용해줘.
+- [Tooltip("초보자용 설명")]도 한글로 추가해줘.
+- 변수 이름은 Unity/C# 규칙 때문에 영어로 유지해줘.
+- 인스펙터에 보이는 설명은 초보자가 이해하기 쉽게 한글로 작성해줘.
+- 코드 주석은 한글로 작성해줘.
+- 어려운 문법보다 쉬운 문법으로 작성해줘.
+- 이 함수는 언제 호출되는지 설명해줘.
+- 이 변수가 어떤 역할인지 설명해줘.
+- 코드 실행 흐름을 순서대로 알려줘.
+- 초보자가 실수하기 쉬운 부분도 알려줘.
 
 코드 작성 조건:
 - BubbleLauncherController.cs의 isLaunching 관련 설정만 확인/수정해줘.
 - 새 스크립트를 만들 필요가 없으면 만들지 마.
 - Inspector에서 뭘 설정해야 하는지 알려줘.
+- 충돌이 여러 번 들어와도 멈춤 처리가 한 번만 되게 안전장치를 넣어줘.
 
 자동저장 조건:
 - 기능 하나가 완성되면 Unity에서 Scene(씬)을 저장하라고 알려줘.
@@ -62,6 +73,18 @@ Unity 프로젝트 폴더:
 6. Inspector에서 조절할 변수
 7. 테스트 성공 기준
 8. 다음 기능으로 넘어가기 전 체크리스트
+
+설명 스타일:
+- 초등학생도 이해할 수 있게 차근차근 설명해줘.
+- 코드만 알려주지 말고 코드 설명도 해줘.
+- 한 줄씩 설명하고 설치 순서도 알려줘.
+- 오브젝트 세팅 순서도 알려줘.
+- 오류날 수 있는 부분도 알려줘.
+- 함수별 설명을 해줘.
+- 이 코드가 왜 이렇게 동작하는지 초보자도 이해하게 설명해줘.
+- 실행 순서를 번호로 설명해줘.
+- 변수, 함수, if문이 각각 무슨 역할인지 알려줘.
+- 마지막에 내가 외워야 할 핵심만 짧게 뽑아줘.
 
 주의:
 - 이번에는 기능 24번만 만들어줘.
