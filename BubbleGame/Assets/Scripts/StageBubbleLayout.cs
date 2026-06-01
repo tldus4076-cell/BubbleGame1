@@ -487,23 +487,58 @@ public class StageBubbleLayout : MonoBehaviour
     // BubbleCurrentController가 이 함수를 사용해서 스테이지 버블과 같은 크기를 맞춥니다.
     public float GetBubbleDiameter()
     {
+        float finalSpacing = GetBubbleSpacing();
+        float finalBubbleDiameter = finalSpacing * Mathf.Clamp(bubbleVisualScale, 0.1f, 1.3f);
+
+        return finalBubbleDiameter;
+    }
+
+    // 스테이지 버블 사이의 격자 간격을 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    // 버블 그림 크기와 달리, 이 값은 줄 맞춤 위치를 계산할 때 사용합니다.
+    public float GetBubbleSpacing()
+    {
         // 벽 안쪽 너비를 계산합니다.
         Transform leftWall = transform.Find("LeftWall");
         Transform rightWall = transform.Find("RightWall");
 
         if (leftWall == null || rightWall == null)
         {
-            return bubbleVisualScale;
+            return bubbleSpacing;
         }
 
         float leftX = transform.InverseTransformPoint(GetWorldBounds(leftWall).max).x + horizontalPadding;
         float rightX = transform.InverseTransformPoint(GetWorldBounds(rightWall).min).x - horizontalPadding;
         float availableWidth = Mathf.Max(rightX - leftX, bubbleSpacing);
         float spacingToFit = cols > 0 ? availableWidth / cols : availableWidth;
-        float finalSpacing = spacingToFit;
-        float finalBubbleDiameter = finalSpacing * Mathf.Clamp(bubbleVisualScale, 0.1f, 1.3f);
 
-        return finalBubbleDiameter;
+        return spacingToFit;
+    }
+
+    // 버블이 움직이고 붙을 수 있는 월드 좌표 범위를 알려주는 함수입니다.
+    // 월드 좌표는 씬 전체 기준 위치입니다.
+    public bool TryGetPlayAreaWorldBounds(out float leftX, out float rightX, out float ceilingY)
+    {
+        leftX = 0f;
+        rightX = 0f;
+        ceilingY = 0f;
+
+        Transform leftWall = transform.Find("LeftWall");
+        Transform rightWall = transform.Find("RightWall");
+        Transform ceiling = transform.Find("Ceiling");
+
+        if (leftWall == null || rightWall == null || ceiling == null)
+        {
+            return false;
+        }
+
+        // LeftWall의 오른쪽 끝보다 오른쪽, RightWall의 왼쪽 끝보다 왼쪽만 사용합니다.
+        leftX = GetWorldBounds(leftWall).max.x + horizontalPadding;
+        rightX = GetWorldBounds(rightWall).min.x - horizontalPadding;
+
+        // Ceiling의 아래쪽 끝보다 아래쪽만 사용합니다.
+        ceilingY = GetWorldBounds(ceiling).min.y - ceilingPadding;
+
+        return true;
     }
 }
 
