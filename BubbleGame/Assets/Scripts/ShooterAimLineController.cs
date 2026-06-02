@@ -223,6 +223,40 @@ public class ShooterAimLineController : MonoBehaviour
         DrawReflectedAimLine(startPoint, worldDirection);
     }
 
+    // 현재 조준선이 바라보는 첫 번째 방향을 다른 스크립트가 읽을 수 있게 해주는 함수입니다.
+    // BubbleLauncherController가 이 함수를 사용하면 조준선과 버블 발사 방향이 똑같아집니다.
+    public Vector2 GetCurrentAimDirection()
+    {
+        // 먼저 조준선을 현재 마우스/슈터 방향으로 다시 그립니다.
+        // 이렇게 해야 발사하는 순간의 실제 조준선 방향을 읽을 수 있습니다.
+        UpdateAimLine();
+
+        // LineRenderer에 실제로 그려진 첫 번째 선분을 읽습니다.
+        // 화면에 보이는 선의 0번 점에서 1번 점으로 가는 방향이 진짜 발사 방향입니다.
+        if (lineRenderer != null && lineRenderer.positionCount >= 2)
+        {
+            Vector3 firstPoint = lineRenderer.GetPosition(0);
+            Vector3 secondPoint = lineRenderer.GetPosition(1);
+            Vector3 lineDirection = secondPoint - firstPoint;
+
+            if (lineDirection.sqrMagnitude > 0.001f)
+            {
+                return new Vector2(lineDirection.x, lineDirection.y).normalized;
+            }
+        }
+
+        // 혹시 LineRenderer에서 방향을 읽지 못하면 Transform 방향을 예비로 사용합니다.
+        if (aimDirectionSource == null)
+        {
+            return Vector2.up;
+        }
+
+        Vector3 worldDirection = aimDirectionSource.TransformDirection(new Vector3(aimLocalDirection.x, aimLocalDirection.y, 0f));
+        worldDirection.Normalize();
+
+        return new Vector2(worldDirection.x, worldDirection.y).normalized;
+    }
+
     // 벽에 닿으면 반사되는 조준선을 계산해서 LineRenderer에 넣는 함수입니다.
     private void DrawReflectedAimLine(Vector3 startPoint, Vector3 worldDirection)
     {

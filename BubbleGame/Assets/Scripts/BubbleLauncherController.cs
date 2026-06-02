@@ -36,6 +36,10 @@ public class BubbleLauncherController : MonoBehaviour
     // ShooterAimController는 "슈터 조준 방향"을 담당하는 스크립트입니다.
     private ShooterAimController aimController;
 
+    // ShooterAimLineController는 화면에 보이는 조준선을 담당하는 스크립트입니다.
+    // 발사 방향을 조준선과 똑같이 맞추기 위해 사용합니다.
+    private ShooterAimLineController aimLineController;
+
     // StageBubbleLayout은 "스테이지 버블 배치"를 담당하는 스크립트입니다.
     // 멈춘 버블을 스테이지 버블 자식으로 넣을 때 사용합니다.
     private StageBubbleLayout stageBubbleLayout;
@@ -67,6 +71,12 @@ public class BubbleLauncherController : MonoBehaviour
         if (aimController == null)
         {
             aimController = FindFirstObjectByType<ShooterAimController>();
+        }
+
+        aimLineController = GetComponentInChildren<ShooterAimLineController>();
+        if (aimLineController == null)
+        {
+            aimLineController = FindFirstObjectByType<ShooterAimLineController>();
         }
 
         // StageBubbleLayout은 WallsRoot에 붙어 있습니다.
@@ -133,6 +143,17 @@ public class BubbleLauncherController : MonoBehaviour
     // ============================================================
     private Vector2 GetLaunchDirection()
     {
+        // 조준선 스크립트가 있으면 조준선이 실제로 사용하는 방향을 그대로 가져옵니다.
+        // 이렇게 해야 화면에 보이는 조준선과 발사 방향이 서로 반대로 어긋나지 않습니다.
+        if (aimLineController != null)
+        {
+            Vector2 aimLineDirection = aimLineController.GetCurrentAimDirection();
+            if (aimLineDirection.sqrMagnitude > 0.001f)
+            {
+                return KeepLaunchDirectionUpward(aimLineDirection);
+            }
+        }
+
         if (aimController != null)
         {
             Transform aimTransform = aimController.transform;
@@ -140,13 +161,38 @@ public class BubbleLauncherController : MonoBehaviour
 
             if (shooterVisual != null)
             {
-                return shooterVisual.up.normalized;
+                return KeepLaunchDirectionUpward(shooterVisual.up.normalized);
             }
 
-            return aimTransform.up.normalized;
+            return KeepLaunchDirectionUpward(aimTransform.up.normalized);
         }
 
         return Vector2.up;
+    }
+
+    // ============================================================
+    // 발사 방향이 아래쪽이나 뒤쪽으로 뒤집히지 않게 보정하는 함수입니다.
+    //
+    // [왜 필요한가?]
+    // 조준선/슈터 회전 연결이 순간적으로 반대로 읽히면 버블이 뒤로 날아갈 수 있습니다.
+    // 버블슈터에서는 항상 위쪽 경기장 안으로 발사해야 하므로, y가 음수면 방향을 뒤집습니다.
+    // ============================================================
+    private Vector2 KeepLaunchDirectionUpward(Vector2 direction)
+    {
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            return Vector2.up;
+        }
+
+        direction = direction.normalized;
+
+        // 아래쪽으로 읽혔다면 반대로 뒤집어서 위쪽으로 보냅니다.
+        if (direction.y < 0f)
+        {
+            direction = -direction;
+        }
+
+        return direction.normalized;
     }
 
     // ============================================================
@@ -257,15 +303,20 @@ public class BubbleLauncherController : MonoBehaviour
             stoppedBubble.transform.SetParent(stageBubbleLayout.transform);
         }
 
+        // [기능 31] 같은 색 찾기
+        // 버블이 붙은 뒤, 주변 6방향에 같은 색 버블이 있는지 확인합니다.
+        FindSameColorBubbles(stoppedBubble);
+
+        // [기능 32] 같은 색 3개 이상 찾기
+        // 새 버블부터 시작해서 같은 색으로 이어진 버블 전체 개수를 셉니다.
+        CheckThreeOrMoreSameColorBubbles(stoppedBubble);
+
         // BubbleSwapController에게 다음 버블을 현재 버블로 바꿔달라고 말합니다.
+        // 색 검사를 먼저 끝낸 뒤 다음 버블로 교체합니다.
         if (swapController != null)
         {
             swapController.SwapBubbles();
         }
-
-        // [기능 31] 같은 색 찾기
-        // 버블이 붙은 뒤, 주변 6방향에 같은 색 버블이 있는지 확인합니다.
-        FindSameColorBubbles(stoppedBubble);
     }
 
     // ============================================================
@@ -305,79 +356,27 @@ public class BubbleLauncherController : MonoBehaviour
             return;
         }
 
-        // 격자 간격을 가져옵니다.
-        float bubbleSpacing = stageBubbleLayout.GetBubbleSpacing();
-        float verticalSpacing = bubbleSpacing * Mathf.Sqrt(3f) / 2f;
-
-        // 버블슈터 벌집 모양 6방향 오프셋을 만듭니다.
-        // (왼쪽, 오른쪽, 왼쪽 위, 오른쪽 위, 왼쪽 아래, 오른쪽 아래)
-        Vector3[] neighborOffsets = new Vector3[]
-        {
-            new Vector3(-bubbleSpacing, 0f, 0f),                    // 왼쪽
-            new Vector3(bubbleSpacing, 0f, 0f),                     // 오른쪽
-            new Vector3(-bubbleSpacing / 2f, verticalSpacing, 0f),  // 왼쪽 위
-            new Vector3(bubbleSpacing / 2f, verticalSpacing, 0f),   // 오른쪽 위
-            new Vector3(-bubbleSpacing / 2f, -verticalSpacing, 0f), // 왼쪽 아래
-            new Vector3(bubbleSpacing / 2f, -verticalSpacing, 0f)   // 오른쪽 아래
-        };
-
-        // 같은 색 버블을 찾을 때 사용할 감지 반지름입니다.
-        // 버블 간격의 절반보다 살짝 크게 해서 옆 버블을 정확히 감지합니다.
-        float checkRadius = bubbleSpacing * 0.6f;
-
         // 같은 색 버블을 저장할 리스트입니다.
         // List<GameObject>는 "GameObject 목록"이라는 뜻입니다.
         System.Collections.Generic.List<GameObject> sameColorBubbles = new System.Collections.Generic.List<GameObject>();
 
-        // 6방향을 하나씩 확인합니다.
-        for (int i = 0; i < neighborOffsets.Length; i++)
+        // 실제로 한 칸 거리 안에 있는 이웃 버블만 가져옵니다.
+        // 이렇게 해야 멀리 있는 같은 색 버블을 잘못 세지 않습니다.
+        System.Collections.Generic.List<GameObject> neighborBubbles = FindAdjacentBubbles(stoppedBubble);
+
+        for (int i = 0; i < neighborBubbles.Count; i++)
         {
-            // 이번 방향의 중심 위치를 계산합니다.
-            Vector3 checkPosition = stoppedBubble.transform.position + neighborOffsets[i];
-
-            // 이 위치 근처에 있는 모든 Collider2D를 찾습니다.
-            Collider2D[] hitColliders = Physics2D.OverlapCircleAll(checkPosition, checkRadius, ~0);
-
-            // 찾은 Collider를 하나씩 확인합니다.
-            for (int j = 0; j < hitColliders.Length; j++)
+            GameObject hitObject = neighborBubbles[i];
+            SpriteRenderer hitRenderer = hitObject.GetComponent<SpriteRenderer>();
+            if (hitRenderer == null)
             {
-                GameObject hitObject = hitColliders[j].gameObject;
+                continue;
+            }
 
-                // 자기 자신은 제외합니다.
-                if (hitObject == stoppedBubble)
-                {
-                    continue;
-                }
-
-                // Bubble_로 시작하는 이름만 스테이지 버블입니다.
-                if (!hitObject.name.StartsWith("Bubble_"))
-                {
-                    continue;
-                }
-
-                // 이미 리스트에 들어있는 버블은 중복으로 추가하지 않습니다.
-                if (sameColorBubbles.Contains(hitObject))
-                {
-                    continue;
-                }
-
-                // 주변 버블의 SpriteRenderer를 가져옵니다.
-                SpriteRenderer hitRenderer = hitObject.GetComponent<SpriteRenderer>();
-                if (hitRenderer == null)
-                {
-                    continue;
-                }
-
-                // 주변 버블의 "실제로 보이는 색"을 가져옵니다.
-                Color hitColor = GetVisibleBubbleColor(hitRenderer);
-
-                // 색을 비교합니다.
-                // Color는 빨강(R), 초록(G), 파랑(B), 투명도(A)로 이루어져 있습니다.
-                // 두 색이 같으면 같은 버블로 판단합니다.
-                if (IsSameColor(stoppedColor, hitColor))
-                {
-                    sameColorBubbles.Add(hitObject);
-                }
+            Color hitColor = GetVisibleBubbleColor(hitRenderer);
+            if (IsSameColor(stoppedColor, hitColor))
+            {
+                sameColorBubbles.Add(hitObject);
             }
         }
 
@@ -395,6 +394,204 @@ public class BubbleLauncherController : MonoBehaviour
         {
             Debug.Log("[기능 31] 주변에 같은 색 버블이 없습니다.");
         }
+    }
+
+    // ============================================================
+    // [기능 32] 같은 색 3개 이상 찾기
+    // 새로 붙은 버블부터 시작해서, 같은 색으로 이어진 버블 전체를 찾습니다.
+    //
+    // [왜 필요한가?]
+    // 버블슈터에서는 같은 색 버블이 3개 이상 연결되면 나중에 제거해야 합니다.
+    // 이번 기능에서는 아직 제거하지 않고, "3개 이상인지 확인"만 합니다.
+    //
+    // [쉬운 비유]
+    // 같은 색 친구 찾기라고 생각하면 됩니다.
+    // 새 빨강 버블 옆에 빨강 친구가 있으면 그 친구를 찾고,
+    // 그 친구 옆에 또 빨강 친구가 있으면 계속 따라가며 찾습니다.
+    //
+    // stoppedBubble: 새로 붙은 버블 오브젝트
+    // ============================================================
+    private void CheckThreeOrMoreSameColorBubbles(GameObject stoppedBubble)
+    {
+        // 같은 색으로 연결된 버블 목록을 찾습니다.
+        System.Collections.Generic.List<GameObject> connectedBubbles = FindConnectedSameColorBubbles(stoppedBubble);
+
+        // 새 버블 색 이름을 Console에 보기 좋게 출력하기 위해 가져옵니다.
+        SpriteRenderer stoppedRenderer = stoppedBubble.GetComponent<SpriteRenderer>();
+        Color stoppedColor = stoppedRenderer != null ? GetVisibleBubbleColor(stoppedRenderer) : Color.white;
+        string colorName = GetColorName(stoppedColor);
+
+        // Count는 리스트 안에 들어 있는 개수입니다.
+        int connectedCount = connectedBubbles.Count;
+
+        if (connectedCount >= 3)
+        {
+            Debug.Log($"[기능 32] 같은 색 3개 이상 발견! 색: {colorName}, 연결 개수: {connectedCount}개");
+        }
+        else
+        {
+            Debug.Log($"[기능 32] 같은 색 3개 미만입니다. 색: {colorName}, 연결 개수: {connectedCount}개");
+        }
+    }
+
+    // ============================================================
+    // 같은 색으로 연결된 버블 전체를 찾는 함수입니다.
+    //
+    // [초보자용 설명]
+    // 1. 먼저 새 버블을 확인할 목록(toCheck)에 넣습니다.
+    // 2. 확인할 목록에서 하나씩 꺼냅니다.
+    // 3. 그 버블 주변 6방향에 같은 색 버블이 있는지 찾습니다.
+    // 4. 새로 찾은 같은 색 버블도 확인할 목록에 넣습니다.
+    // 5. 더 확인할 버블이 없을 때까지 반복합니다.
+    //
+    // startBubble: 시작 버블, 보통 새로 붙은 버블입니다.
+    // return: 같은 색으로 연결된 모든 버블 목록입니다. 시작 버블도 포함합니다.
+    // ============================================================
+    private System.Collections.Generic.List<GameObject> FindConnectedSameColorBubbles(GameObject startBubble)
+    {
+        // 최종 결과 목록입니다. 같은 색으로 연결된 버블들이 여기에 들어갑니다.
+        System.Collections.Generic.List<GameObject> connectedBubbles = new System.Collections.Generic.List<GameObject>();
+
+        // 앞으로 확인해야 할 버블 목록입니다.
+        System.Collections.Generic.List<GameObject> toCheckBubbles = new System.Collections.Generic.List<GameObject>();
+
+        if (startBubble == null)
+        {
+            return connectedBubbles;
+        }
+
+        SpriteRenderer startRenderer = startBubble.GetComponent<SpriteRenderer>();
+        if (startRenderer == null)
+        {
+            return connectedBubbles;
+        }
+
+        // 시작 버블의 실제 보이는 색을 기준 색으로 사용합니다.
+        Color targetColor = GetVisibleBubbleColor(startRenderer);
+
+        // 시작 버블도 연결된 버블 1개로 세야 합니다.
+        connectedBubbles.Add(startBubble);
+        toCheckBubbles.Add(startBubble);
+
+        // 확인할 버블이 남아 있는 동안 계속 반복합니다.
+        while (toCheckBubbles.Count > 0)
+        {
+            // 리스트의 첫 번째 버블을 꺼내서 확인합니다.
+            GameObject currentBubble = toCheckBubbles[0];
+            toCheckBubbles.RemoveAt(0);
+
+            // 현재 버블 주변 6방향에서 같은 색 이웃을 찾습니다.
+            System.Collections.Generic.List<GameObject> sameColorNeighbors = FindSameColorNeighbors(currentBubble, targetColor);
+
+            for (int i = 0; i < sameColorNeighbors.Count; i++)
+            {
+                GameObject neighborBubble = sameColorNeighbors[i];
+
+                // 이미 연결 목록에 들어간 버블이면 다시 넣지 않습니다.
+                // 이렇게 해야 무한 반복을 막을 수 있습니다.
+                if (connectedBubbles.Contains(neighborBubble))
+                {
+                    continue;
+                }
+
+                connectedBubbles.Add(neighborBubble);
+                toCheckBubbles.Add(neighborBubble);
+            }
+        }
+
+        return connectedBubbles;
+    }
+
+    // ============================================================
+    // 한 버블 주변 6방향에서 같은 색 이웃 버블만 찾아주는 함수입니다.
+    //
+    // bubble: 중심이 되는 버블입니다.
+    // targetColor: 찾아야 하는 색입니다.
+    // return: 중심 버블 주변에 있는 같은 색 버블 목록입니다.
+    // ============================================================
+    private System.Collections.Generic.List<GameObject> FindSameColorNeighbors(GameObject bubble, Color targetColor)
+    {
+        System.Collections.Generic.List<GameObject> neighbors = new System.Collections.Generic.List<GameObject>();
+
+        if (bubble == null || stageBubbleLayout == null)
+        {
+            return neighbors;
+        }
+
+        System.Collections.Generic.List<GameObject> adjacentBubbles = FindAdjacentBubbles(bubble);
+
+        for (int i = 0; i < adjacentBubbles.Count; i++)
+        {
+            GameObject hitObject = adjacentBubbles[i];
+            SpriteRenderer hitRenderer = hitObject.GetComponent<SpriteRenderer>();
+            if (hitRenderer == null)
+            {
+                continue;
+            }
+
+            Color hitColor = GetVisibleBubbleColor(hitRenderer);
+            if (IsSameColor(targetColor, hitColor))
+            {
+                neighbors.Add(hitObject);
+            }
+        }
+
+        return neighbors;
+    }
+
+    // ============================================================
+    // 중심 버블에 실제로 붙어 있는 이웃 버블만 찾는 함수입니다.
+    //
+    // [왜 필요한가?]
+    // 예전 방식은 6방향 예상 위치마다 큰 원을 검사했습니다.
+    // 그러면 실제로 붙어 있지 않은 근처 버블까지 잡혀서 3개 이상으로 잘못 셀 수 있습니다.
+    // 이 함수는 중심 버블에서 "한 칸 거리" 안에 있는 버블만 이웃으로 인정합니다.
+    // ============================================================
+    private System.Collections.Generic.List<GameObject> FindAdjacentBubbles(GameObject centerBubble)
+    {
+        System.Collections.Generic.List<GameObject> adjacentBubbles = new System.Collections.Generic.List<GameObject>();
+
+        if (centerBubble == null || stageBubbleLayout == null)
+        {
+            return adjacentBubbles;
+        }
+
+        float bubbleSpacing = stageBubbleLayout.GetBubbleSpacing();
+
+        // 이웃 버블 중심 간 거리는 bubbleSpacing 정도입니다.
+        // 1.15를 곱해서 아주 작은 위치 오차는 허용합니다.
+        float neighborDistance = bubbleSpacing * 1.15f;
+        Collider2D[] hitColliders = Physics2D.OverlapCircleAll(centerBubble.transform.position, neighborDistance, ~0);
+
+        for (int i = 0; i < hitColliders.Length; i++)
+        {
+            GameObject hitObject = hitColliders[i].gameObject;
+
+            if (hitObject == centerBubble)
+            {
+                continue;
+            }
+
+            if (!hitObject.name.StartsWith("Bubble_"))
+            {
+                continue;
+            }
+
+            if (adjacentBubbles.Contains(hitObject))
+            {
+                continue;
+            }
+
+            float distance = Vector2.Distance(centerBubble.transform.position, hitObject.transform.position);
+
+            // 너무 가까운 값은 겹침 오류일 수 있고, 너무 먼 값은 이웃이 아닙니다.
+            if (distance > 0.01f && distance <= neighborDistance)
+            {
+                adjacentBubbles.Add(hitObject);
+            }
+        }
+
+        return adjacentBubbles;
     }
 
     // ============================================================
