@@ -143,28 +143,25 @@ public class BubbleLauncherController : MonoBehaviour
     // ============================================================
     private Vector2 GetLaunchDirection()
     {
-        // 조준선 스크립트가 있으면 조준선이 실제로 사용하는 방향을 그대로 가져옵니다.
-        // 이렇게 해야 화면에 보이는 조준선과 발사 방향이 서로 반대로 어긋나지 않습니다.
+        // 발사 방향은 화면에 실제로 그려진 조준선 방향을 먼저 사용합니다.
+        // 이렇게 해야 플레이어가 보는 조준선과 실제 버블 발사 방향이 똑같아집니다.
         if (aimLineController != null)
         {
             Vector2 aimLineDirection = aimLineController.GetCurrentAimDirection();
             if (aimLineDirection.sqrMagnitude > 0.001f)
             {
-                return KeepLaunchDirectionUpward(aimLineDirection);
+                return KeepLaunchDirectionUpward(-aimLineDirection);
             }
         }
 
+        // 조준선에서 방향을 못 읽었을 때만 ShooterAimController의 각도값을 예비로 사용합니다.
         if (aimController != null)
         {
-            Transform aimTransform = aimController.transform;
-            Transform shooterVisual = aimTransform.Find("ShooterVisual");
-
-            if (shooterVisual != null)
+            Vector2 aimDirection = aimController.GetCurrentAimDirection();
+            if (aimDirection.sqrMagnitude > 0.001f)
             {
-                return KeepLaunchDirectionUpward(shooterVisual.up.normalized);
+                return KeepLaunchDirectionUpward(-aimDirection);
             }
-
-            return KeepLaunchDirectionUpward(aimTransform.up.normalized);
         }
 
         return Vector2.up;
@@ -228,6 +225,10 @@ public class BubbleLauncherController : MonoBehaviour
         // 발사된 버블을 Default 레이어(0번)로 설정합니다.
         launchedBubble.layer = 0;
 
+        // 발사 순간 화면에 보이는 조준선 경로를 복사해 둡니다.
+        // 버블이 날아가는 동안 마우스를 움직여도, 붙을 위치 계산은 발사 당시 조준선 기준으로 해야 합니다.
+        Vector3[] launchAimLinePoints = aimLineController != null ? aimLineController.GetCurrentAimLinePoints() : null;
+
         // 슈터 위치에서 발사합니다.
         launchedBubble.transform.position = currentBubbleTransform.position;
 
@@ -262,7 +263,7 @@ public class BubbleLauncherController : MonoBehaviour
 
         // 충돌 감지를 위한 스크립트를 붙입니다.
         BubbleCollisionHandler collisionHandler = launchedBubble.AddComponent<BubbleCollisionHandler>();
-        collisionHandler.Initialize(this, stageBubbleLayout);
+        collisionHandler.Initialize(this, stageBubbleLayout, launchAimLinePoints);
     }
 
     // ============================================================
@@ -742,6 +743,10 @@ public class BubbleCollisionHandler : MonoBehaviour
     // StageBubbleLayout은 격자 간격을 계산하고, 멈춘 버블을 자식으로 넣을 때 사용합니다.
     private StageBubbleLayout stageBubbleLayout;
 
+    // 발사 순간 화면에 그려져 있던 조준선 점들입니다.
+    // 꺾인 조준선으로 쐈을 때, 붙을 위치를 이 경로 기준으로 고르기 위해 저장합니다.
+    private Vector3[] launchAimLinePoints;
+
     // ---- 타이머 변수들 ----
 
     // 스폰 직후 충돌을 무시하기 위한 타이머입니다.
@@ -757,6 +762,10 @@ public class BubbleCollisionHandler : MonoBehaviour
     // 바로 전 프레임 위치입니다.
     private Vector3 previousPosition;
 
+    // Rigidbody2D에서 읽은 현재 이동 방향입니다.
+    // 벽에 튕긴 뒤에도 이 값은 정확히 갱신됩니다.
+    private Vector3 currentVelocityDirection = Vector3.up;
+
     // ---- 조준선 경로 추적 변수들 ----
 
     // 발사를 시작한 위치입니다.
@@ -769,10 +778,11 @@ public class BubbleCollisionHandler : MonoBehaviour
     // Initialize는 BubbleLauncherController에서 호출됩니다.
     // 발사된 버블에 이 스크립트를 붙일 때 한 번만 호출됩니다.
     // ============================================================
-    public void Initialize(BubbleLauncherController launcherController, StageBubbleLayout layout)
+    public void Initialize(BubbleLauncherController launcherController, StageBubbleLayout layout, Vector3[] aimLinePoints)
     {
         launcher = launcherController;
         stageBubbleLayout = layout;
+        launchAimLinePoints = aimLinePoints;
         spawnTime = Time.time;
 
         // 발사된 버블의 크기에 맞게 감지 반지름을 설정합니다.
@@ -812,9 +822,20 @@ public class BubbleCollisionHandler : MonoBehaviour
     // ============================================================
     private void Update()
     {
+        // Rigidbody2D에서 직접 이동 방향을 읽습니다.
+        // 벽에 튕긴 직후에도 velocity는 반사된 방향을 정확히 보여줍니다.
+        // 프레임마다 위치 차이를 계산하는 것보다 훨씬 안정적입니다.
+        Vector3 currentPosition = transform.position;
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        if (rb != null && rb.linearVelocity.sqrMagnitude > 0.01f)
+        {
+            currentVelocityDirection = rb.linearVelocity.normalized;
+        }
+
         // 스폰 직후에는 감지하지 않습니다.
         if (Time.time - spawnTime < IgnoreCollisionAfterSpawn)
         {
+            previousPosition = currentPosition;
             return;
         }
 
@@ -824,9 +845,14 @@ public class BubbleCollisionHandler : MonoBehaviour
         // 현재 버블 위치에서 감지 반지름 안에 있는 Collider2D를 모두 찾습니다.
         Collider2D[] hitColliders = Physics2D.OverlapCircleAll(transform.position, detectionRadius, ~0);
 
-        // 가장 가까운 스테이지 버블을 기억합니다.
+        // 발사 버블이 실제로 향하고 있는 앞쪽 스테이지 버블을 기억합니다.
+        // 그냥 가장 가까운 버블을 고르면, 버블이 살짝 파고든 순간 옆/뒤 버블이 선택되어 반대쪽에 붙을 수 있습니다.
         Collider2D nearestBubbleCollider = null;
-        float nearestBubbleDistance = float.MaxValue;
+        float bestForwardScore = float.MinValue;
+
+        // 혹시 앞쪽 버블을 못 찾았을 때 사용할 예비값입니다.
+        Collider2D fallbackNearestBubbleCollider = null;
+        float fallbackNearestBubbleDistance = float.MaxValue;
         bool touchedCeiling = false;
 
         for (int i = 0; i < hitColliders.Length; i++)
@@ -844,10 +870,27 @@ public class BubbleCollisionHandler : MonoBehaviour
             if (hitCollider.gameObject.name.StartsWith("Bubble_"))
             {
                 float distance = Vector2.Distance(transform.position, hitCollider.transform.position);
-                if (distance < nearestBubbleDistance)
+
+                if (distance < fallbackNearestBubbleDistance)
                 {
-                    nearestBubbleDistance = distance;
-                    nearestBubbleCollider = hitCollider;
+                    fallbackNearestBubbleDistance = distance;
+                    fallbackNearestBubbleCollider = hitCollider;
+                }
+
+                // 현재 발사 버블에서 스테이지 버블 쪽으로 가는 방향입니다.
+                Vector3 directionToBubble = hitCollider.transform.position - transform.position;
+                if (directionToBubble.sqrMagnitude > 0.001f)
+                {
+                    directionToBubble.Normalize();
+
+                    // Dot 값이 클수록 발사 버블이 향하는 앞쪽에 있는 버블입니다.
+                    float forwardScore = Vector3.Dot(currentVelocityDirection, directionToBubble);
+
+                    if (forwardScore > bestForwardScore)
+                    {
+                        bestForwardScore = forwardScore;
+                        nearestBubbleCollider = hitCollider;
+                    }
                 }
             }
 
@@ -867,6 +910,13 @@ public class BubbleCollisionHandler : MonoBehaviour
             return;
         }
 
+        // 앞쪽 버블을 못 골랐으면 예비로 가장 가까운 버블을 사용합니다.
+        if (fallbackNearestBubbleCollider != null)
+        {
+            HandleBubbleAttachment(fallbackNearestBubbleCollider.gameObject);
+            return;
+        }
+
         // 천장에만 닿았을 때의 처리입니다.
         if (touchedCeiling)
         {
@@ -875,7 +925,7 @@ public class BubbleCollisionHandler : MonoBehaviour
         }
 
         // 아무것도 닿지 않았다면 현재 위치를 다음 프레임의 이전 위치로 저장합니다.
-        previousPosition = transform.position;
+        previousPosition = currentPosition;
     }
 
     // ============================================================
@@ -921,6 +971,10 @@ public class BubbleCollisionHandler : MonoBehaviour
         float bubbleDiameter = layout.GetBubbleDiameter();
         float bubbleSpacing = layout.GetBubbleSpacing();
 
+        // 발사 전 표시 버블 크기가 달라도, 멈춰서 스테이지에 붙을 때는 스테이지 버블 크기로 맞춥니다.
+        // 그래야 기존 버블과 새 버블의 크기가 달라서 겹쳐 보이는 일을 막을 수 있습니다.
+        transform.localScale = Vector3.one * bubbleDiameter;
+
         // 버블슈터 격자는 벌집 모양 6방향입니다.
         // 세로 간격 = 가로 간격 * 루트3 / 2
         float verticalSpacing = bubbleSpacing * Mathf.Sqrt(3f) / 2f;
@@ -952,8 +1006,9 @@ public class BubbleCollisionHandler : MonoBehaviour
     // ============================================================
     private void HandleCeilingAttachment()
     {
-        // 기존 스테이지 버블 근처의 빈칸을 찾습니다.
-        if (TryFindCeilingFallbackPosition())
+        // 천장에 닿았을 때는 빈칸을 찾아다니지 않고,
+        // 조준선이 가리키는 벌집 격자 칸으로 바로 붙입니다.
+        if (TryAttachToAimedCeilingGridPosition())
         {
             return;
         }
@@ -961,9 +1016,104 @@ public class BubbleCollisionHandler : MonoBehaviour
         // 빈칸을 못 찾으면 안전한 위치에 멈춥니다.
         StopBubblePhysics();
         float bubbleDiameter = stageBubbleLayout != null ? stageBubbleLayout.GetBubbleDiameter() : transform.localScale.x;
+        transform.localScale = Vector3.one * bubbleDiameter;
         Vector3 safePosition = ClampPositionInsidePlayArea(transform.position, bubbleDiameter);
         transform.position = safePosition;
         FinishBubbleStop();
+    }
+
+    // ============================================================
+    // 천장에 닿았을 때 조준선이 가리키는 격자 칸에 바로 붙입니다.
+    //
+    // [중요]
+    // 이 함수는 "빈칸을 찾아다니는 검색"을 하지 않습니다.
+    // StageBubbleLayout의 벌집 격자 칸들을 계산한 뒤,
+    // 발사 순간 조준선과 가장 가까운 칸을 고릅니다.
+    // ============================================================
+    private bool TryAttachToAimedCeilingGridPosition()
+    {
+        if (stageBubbleLayout == null)
+        {
+            return false;
+        }
+
+        if (!stageBubbleLayout.TryGetPlayAreaWorldBounds(out float leftX, out float rightX, out float ceilingY))
+        {
+            return false;
+        }
+
+        float bubbleDiameter = stageBubbleLayout.GetBubbleDiameter();
+        float bubbleSpacing = stageBubbleLayout.GetBubbleSpacing();
+        float verticalSpacing = stageBubbleLayout.useStaggeredRows ? bubbleSpacing * Mathf.Sqrt(3f) / 2f : bubbleSpacing;
+
+        // 멈춰서 스테이지에 붙는 순간에는 스테이지 버블 크기와 같게 맞춥니다.
+        transform.localScale = Vector3.one * bubbleDiameter;
+
+        int safeCols = Mathf.Max(1, stageBubbleLayout.cols);
+        int safeRows = Mathf.Max(1, stageBubbleLayout.rows + 3);
+
+        Vector3 bestPosition = transform.position;
+        float bestDistance = float.MaxValue;
+        float bestY = float.MinValue;
+        bool foundPosition = false;
+
+        for (int row = 0; row < safeRows; row++)
+        {
+            bool staggeredRow = stageBubbleLayout.useStaggeredRows && row % 2 == 1;
+            int colsInRow = staggeredRow ? Mathf.Max(1, safeCols - 1) : safeCols;
+
+            float y = ceilingY - bubbleDiameter / 2f - stageBubbleLayout.startYOffset - row * verticalSpacing;
+            float startX = leftX + bubbleSpacing / 2f;
+
+            if (staggeredRow)
+            {
+                startX += bubbleSpacing / 2f;
+            }
+
+            // 이 높이에서 조준선이 지나가는 X 위치입니다.
+            float aimedX = GetAimedXAtY(y);
+
+            for (int col = 0; col < colsInRow; col++)
+            {
+                Vector3 candidatePosition = new Vector3(startX + col * bubbleSpacing, y, transform.position.z);
+
+                if (!IsPositionInsidePlayArea(candidatePosition, bubbleDiameter))
+                {
+                    continue;
+                }
+
+                // 전체 빈칸을 찾아다니지는 않습니다.
+                // 단, 이미 버블이 있는 칸에 겹치면 안 되므로 조준선 근처 후보가 차있는지만 확인합니다.
+                if (IsPositionOccupied(candidatePosition, bubbleDiameter))
+                {
+                    continue;
+                }
+
+                // 조준선과 가장 가까운 격자 칸을 고릅니다.
+                // 거리가 거의 같으면 더 위쪽 칸을 먼저 사용합니다.
+                float distanceFromAimLine = Mathf.Abs(candidatePosition.x - aimedX);
+
+                if (!foundPosition
+                    || distanceFromAimLine < bestDistance - 0.01f
+                    || (Mathf.Abs(distanceFromAimLine - bestDistance) < 0.01f && candidatePosition.y > bestY))
+                {
+                    foundPosition = true;
+                    bestDistance = distanceFromAimLine;
+                    bestY = candidatePosition.y;
+                    bestPosition = candidatePosition;
+                }
+            }
+        }
+
+        if (!foundPosition)
+        {
+            return false;
+        }
+
+        StopBubblePhysics();
+        transform.position = bestPosition;
+        FinishBubbleStop();
+        return true;
     }
 
     // ============================================================
@@ -973,8 +1123,8 @@ public class BubbleCollisionHandler : MonoBehaviour
     // [하는 일]
     // 1. 모든 스테이지 버블을 확인합니다.
     // 2. 각 버블 주변 6방향 빈칸을 찾습니다.
-    // 3. 위쪽 빈칸은 제외합니다. (새 버블이 위에 붙지 않게)
-    // 4. 조준선 X 위치와 가장 가까운 빈칸을 고릅니다.
+    // 3. 조준선 X 위치와 가장 가까운 빈칸을 고릅니다.
+    // 4. 같은 정도로 가까우면 더 위쪽 칸을 고릅니다.
     // ============================================================
     private bool TryFindCeilingFallbackPosition()
     {
@@ -985,14 +1135,18 @@ public class BubbleCollisionHandler : MonoBehaviour
 
         float bubbleDiameter = stageBubbleLayout.GetBubbleDiameter();
         float bubbleSpacing = stageBubbleLayout.GetBubbleSpacing();
+
+        // 천장에 붙는 경우도 스테이지 버블 크기와 똑같이 맞춥니다.
+        transform.localScale = Vector3.one * bubbleDiameter;
+
         float verticalSpacing = bubbleSpacing * Mathf.Sqrt(3f) / 2f;
         Vector3[] neighborOffsets = CreateSixDirectionOffsets(bubbleSpacing, verticalSpacing);
 
         Collider2D[] stageColliders = stageBubbleLayout.GetComponentsInChildren<Collider2D>();
 
         Vector3 bestPosition = transform.position;
-        float bestY = float.MinValue;
         float bestXDistance = float.MaxValue;
+        float bestY = float.MinValue;
         bool foundPosition = false;
 
         for (int i = 0; i < stageColliders.Length; i++)
@@ -1009,12 +1163,6 @@ public class BubbleCollisionHandler : MonoBehaviour
             {
                 Vector3 candidatePosition = stageBubble.transform.position + neighborOffsets[j];
 
-                // 새 버블이 위쪽에 붙지 않게, 기존 버블보다 위인 후보는 제외합니다.
-                if (candidatePosition.y > stageBubble.transform.position.y + 0.01f)
-                {
-                    continue;
-                }
-
                 // 이미 버블이 있는 위치는 제외합니다.
                 if (IsPositionOccupied(candidatePosition, bubbleDiameter))
                 {
@@ -1027,31 +1175,28 @@ public class BubbleCollisionHandler : MonoBehaviour
                     continue;
                 }
 
-                // 먼저 가장 위쪽 빈칸을 고릅니다.
-                // 같은 높이의 빈칸끼리는 조준선 경로와 가장 가까운 칸을 고릅니다.
+                // 천장에 닿았을 때는 조준선이 지나가는 X 위치를 1순위로 봅니다.
+                // 그래야 아무 빈칸이 아니라 플레이어가 조준한 칸에 붙습니다.
                 float targetX = GetAimedXAtY(candidatePosition.y);
                 float xDistance = Mathf.Abs(candidatePosition.x - targetX);
 
                 if (!foundPosition
-                    || candidatePosition.y > bestY + 0.01f
-                    || (Mathf.Abs(candidatePosition.y - bestY) < 0.01f && xDistance < bestXDistance))
+                    || xDistance < bestXDistance - 0.01f
+                    || (Mathf.Abs(xDistance - bestXDistance) < 0.01f && candidatePosition.y > bestY))
                 {
                     foundPosition = true;
                     bestPosition = candidatePosition;
-                    bestY = candidatePosition.y;
                     bestXDistance = xDistance;
+                    bestY = candidatePosition.y;
                 }
             }
         }
 
         if (!foundPosition)
         {
-            // 빈칸을 못 찾으면 안전한 위치에 멈춥니다.
-            StopBubblePhysics();
-            Vector3 safePosition = ClampPositionInsidePlayArea(transform.position, bubbleDiameter);
-            transform.position = safePosition;
-            FinishBubbleStop();
-            return true;
+            // 빈칸을 못 찾았다고 현재 천장 위치에 붙이면 기존 버블과 겹칠 수 있습니다.
+            // 그래서 여기서는 처리하지 않고 false를 돌려줍니다.
+            return false;
         }
 
         StopBubblePhysics();
@@ -1085,7 +1230,7 @@ public class BubbleCollisionHandler : MonoBehaviour
     }
 
     // ============================================================
-    // 6방향 후보 중에서 조준선 경로와 가장 가까운 빈칸을 찾습니다.
+    // 6방향 후보 중에서 발사 버블이 실제로 도착한 위치와 가장 가까운 빈칸을 찾습니다.
     // hitBubblePosition: 닿은 스테이지 버블의 위치
     // neighborOffsets: 6방향 후보 위치 오프셋
     // bubbleDiameter: 버블 크기
@@ -1096,8 +1241,8 @@ public class BubbleCollisionHandler : MonoBehaviour
     // 2. 위쪽 후보는 제외합니다. (겹침 방지)
     // 3. 이미 버블이 있는 후보는 제외합니다.
     // 4. 벽/천장 밖 후보는 제외합니다.
-    // 5. 남은 후보 중 조준선 경로와 가장 가까운 칸을 고릅니다.
-    // 6. 주변이 모두 차 있으면, 스테이지 전체에서 빈칸을 찾습니다.
+    // 5. 남은 후보 중 발사 버블의 현재 위치와 가장 가까운 칸을 고릅니다.
+    // 6. 주변에 빈칸이 없으면 아무 빈칸이나 찾지 않고 현재 위치를 벽 안쪽으로만 보정합니다.
     // ============================================================
     private Vector3 FindBestGridPosition(
         Vector3 hitBubblePosition,
@@ -1106,7 +1251,7 @@ public class BubbleCollisionHandler : MonoBehaviour
         Vector3 referencePosition)
     {
         Vector3 bestPosition = transform.position;
-        float bestScore = float.MaxValue;
+        float bestScore = float.MinValue;
         bool foundAny = false;
 
         for (int i = 0; i < neighborOffsets.Length; i++)
@@ -1132,14 +1277,11 @@ public class BubbleCollisionHandler : MonoBehaviour
                 continue;
             }
 
-            // 후보 칸 높이에서 조준선이 지나가는 X 위치를 계산합니다.
-            float targetX = GetAimedXAtY(candidatePosition.y);
-            float xDistance = Mathf.Abs(candidatePosition.x - targetX);
+            // 후보 칸이 발사 버블의 현재 위치와 얼마나 가까운지 계산합니다.
+            // 가까울수록 조준선을 따라 실제로 도착한 위치에 붙습니다.
+            float score = -Vector3.Distance(candidatePosition, transform.position);
 
-            // 점수를 계산합니다. X 거리가 가까울수록 좋습니다.
-            float score = xDistance;
-
-            if (score < bestScore)
+            if (score > bestScore)
             {
                 bestScore = score;
                 bestPosition = candidatePosition;
@@ -1153,13 +1295,8 @@ public class BubbleCollisionHandler : MonoBehaviour
             return bestPosition;
         }
 
-        // 맞은 버블 주변이 모두 차 있으면, 전체 스테이지에서 빈칸을 찾습니다.
-        if (TryFindAnyEmptyStagePosition(referencePosition, bubbleDiameter, out Vector3 fallbackPosition))
-        {
-            return fallbackPosition;
-        }
-
-        // 정말로 빈칸이 없으면 현재 위치를 벽 안쪽으로 밀어 넣습니다.
+        // 주변이 모두 차 있어도 스테이지 전체 빈칸을 마음대로 찾지 않습니다.
+        // 조준선과 상관없는 곳에 붙는 느낌을 막기 위해 현재 위치를 벽 안쪽으로만 보정합니다.
         return ClampPositionInsidePlayArea(bestPosition, bubbleDiameter);
     }
 
@@ -1249,8 +1386,11 @@ public class BubbleCollisionHandler : MonoBehaviour
     // ============================================================
     private bool IsPositionOccupied(Vector3 candidatePosition, float bubbleDiameter)
     {
-        // 버블 크기의 35%를 감지 반지름으로 사용합니다.
-        float checkRadius = bubbleDiameter * 0.35f;
+        // 빈칸 확인은 그림 크기보다 "격자 간격" 기준이 더 안전합니다.
+        // Bubble Visual Scale을 줄이면 bubbleDiameter가 작아지는데,
+        // 그 작은 값만 쓰면 이미 버블이 있는 칸도 비어 있다고 잘못 판단할 수 있습니다.
+        float spacingBasedRadius = stageBubbleLayout != null ? stageBubbleLayout.GetBubbleSpacing() * 0.45f : 0f;
+        float checkRadius = Mathf.Max(bubbleDiameter * 0.35f, spacingBasedRadius);
         Collider2D[] colliders = Physics2D.OverlapCircleAll(candidatePosition, checkRadius, ~0);
 
         for (int i = 0; i < colliders.Length; i++)
@@ -1314,16 +1454,50 @@ public class BubbleCollisionHandler : MonoBehaviour
     }
 
     // ============================================================
-    // 특정 높이(y)에서 가장 가까운 빈 격자 칸의 x 위치를 반환합니다.
+    // 특정 높이(y)에서 발사 순간 조준선이 지나가는 x 위치를 반환합니다.
     // targetY: 확인할 높이
     //
     // [방법]
-    // 버블의 현재 X 위치를 그대로 반환합니다.
-    // FindBestGridPosition에서 이미 6방향 후보를 검사하므로,
-    // 여기서는 단순히 "현재 위치의 X"를 기준으로 씁니다.
+    // 발사 순간 저장해 둔 조준선 점들을 확인해서,
+    // targetY 높이를 지나가는 선분이 있으면 그 선분 위의 X 위치를 계산합니다.
+    // 꺾인 조준선이라면 두 번째 선분도 포함해서 계산합니다.
     // ============================================================
     private float GetAimedXAtY(float targetY)
     {
+        if (launchAimLinePoints != null && launchAimLinePoints.Length >= 2)
+        {
+            for (int i = 0; i < launchAimLinePoints.Length - 1; i++)
+            {
+                Vector3 startPoint = launchAimLinePoints[i];
+                Vector3 endPoint = launchAimLinePoints[i + 1];
+
+                float minY = Mathf.Min(startPoint.y, endPoint.y);
+                float maxY = Mathf.Max(startPoint.y, endPoint.y);
+
+                // 이 선분이 targetY 높이를 지나가지 않으면 다음 선분을 확인합니다.
+                if (targetY < minY || targetY > maxY)
+                {
+                    continue;
+                }
+
+                // 선분이 거의 수평이면 X 계산이 불안정하므로 시작 X를 사용합니다.
+                if (Mathf.Abs(endPoint.y - startPoint.y) < 0.001f)
+                {
+                    return startPoint.x;
+                }
+
+                // startPoint에서 endPoint까지 몇 퍼센트 지점인지 계산합니다.
+                float t = (targetY - startPoint.y) / (endPoint.y - startPoint.y);
+                t = Mathf.Clamp01(t);
+
+                return Mathf.Lerp(startPoint.x, endPoint.x, t);
+            }
+
+            // targetY와 정확히 만나는 선분이 없으면 조준선 마지막 점의 X를 사용합니다.
+            return launchAimLinePoints[launchAimLinePoints.Length - 1].x;
+        }
+
+        // 조준선 점 정보가 없으면 예비로 현재 버블 X 위치를 사용합니다.
         return transform.position.x;
     }
 

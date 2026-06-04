@@ -116,10 +116,10 @@ TextureImporter:
       name: Yellow_0
       rect:
         serializedVersion: 2
-        x: 478
-        y: 271
-        width: 153
-        height: 153
+        x: 13
+        y: 11
+        width: 231
+        height: 232
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}

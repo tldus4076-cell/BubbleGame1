@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: b0be79a74206a85449d43bf7d9629bcb
+guid: 888053ef9c6aa094da2afb3397409ef5
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8923911374754931897
-    second: Purple_0
+      213: -4020663666348082375
+    second: Bubble_Green_Glossy_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +46,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -113,7 +113,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Purple_0
+      name: Bubble_Green_Glossy_0
       rect:
         serializedVersion: 2
         x: 13
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 74b1aa4b2e5e72480800000000000000
-      internalID: -8923911374754931897
+      spriteID: 93bb006a2bbb338c0800000000000000
+      internalID: -4020663666348082375
       vertices: []
       indices: 
       edges: []
@@ -138,7 +138,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Purple_0: -8923911374754931897
+      Bubble_Green_Glossy_0: -4020663666348082375
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
