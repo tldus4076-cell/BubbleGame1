@@ -257,6 +257,16 @@ public class ShooterAimController : MonoBehaviour
         currentAimAngle = rotationTarget.eulerAngles.z - angleOffset;
     }
 
+    // 다른 스크립트가 현재 조준 방향을 읽을 수 있게 해주는 함수입니다.
+    // BubbleLauncherController가 이 함수를 사용하면 슈터 이미지 보정 각도(angleOffset)에 영향을 받지 않습니다.
+    public Vector2 GetCurrentAimDirection()
+    {
+        float safeAimAngle = ApplyAimLimit(currentAimAngle);
+        float angleRadian = safeAimAngle * Mathf.Deg2Rad;
+
+        return new Vector2(Mathf.Cos(angleRadian), Mathf.Sin(angleRadian)).normalized;
+    }
+
     // 키보드 좌우 입력을 구하는 함수입니다.
     private float GetKeyboardHorizontalInput()
     {

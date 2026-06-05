@@ -1,10 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 
 // TimerController는 화면에 남은 시간을 숫자로 보여주는 스크립트입니다.
 // 이 스크립트는 배경 기능과 분리되어 있어서 StageBackgroundController를 건드리지 않습니다.
 public class TimerController : MonoBehaviour
 {
+    public event Action TimeUp;
+
     [Header("타이머 시간 설정")]
     [Tooltip("게임을 시작할 때 타이머가 몇 초부터 시작할지 정합니다. 예: 4분은 240초입니다.")]
     [SerializeField] private float startTime = 60f;
@@ -22,6 +25,7 @@ public class TimerController : MonoBehaviour
 
     // 타이머가 지금 움직이는 중인지 기억하는 변수입니다.
     private bool isRunning;
+    private bool timeUpRaised;
 
     // Awake는 게임이 시작될 때 Start보다 먼저 한 번 호출됩니다.
     // 여기서는 현재 시간을 시작 시간으로 준비합니다.
@@ -62,6 +66,7 @@ public class TimerController : MonoBehaviour
             currentTime = 0f;
             isRunning = false;
             UpdateTimerText();
+            RaiseTimeUp();
             return;
         }
 
@@ -75,6 +80,12 @@ public class TimerController : MonoBehaviour
 
         // 줄어든 시간을 화면 글자에 다시 표시합니다.
         UpdateTimerText();
+
+        if (currentTime <= 0f)
+        {
+            isRunning = false;
+            RaiseTimeUp();
+        }
     }
 
     // 타이머를 처음 상태로 되돌리는 함수입니다.
@@ -86,6 +97,7 @@ public class TimerController : MonoBehaviour
 
         // 현재 시간을 시작 시간으로 되돌립니다.
         currentTime = startTime;
+        timeUpRaised = false;
 
         // 화면 글자도 현재 시간에 맞게 바꿉니다.
         UpdateTimerText();
@@ -135,6 +147,17 @@ public class TimerController : MonoBehaviour
     {
         // 처음 시작 시간을 돌려줍니다.
         return startTime;
+    }
+
+    private void RaiseTimeUp()
+    {
+        if (timeUpRaised)
+        {
+            return;
+        }
+
+        timeUpRaised = true;
+        TimeUp?.Invoke();
     }
 
     // 화면에 보이는 타이머 숫자를 바꾸는 함수입니다.
