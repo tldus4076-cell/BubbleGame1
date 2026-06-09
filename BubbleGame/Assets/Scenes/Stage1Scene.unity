@@ -481,6 +481,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &490111216
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 490111217}
+  m_Layer: 6
+  m_Name: FirePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &490111217
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490111216}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.86, y: -2.82, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1527810808}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -912,6 +943,59 @@ Sprite:
   m_Bones: []
   m_ScriptableObjects: []
   m_SpriteID: 
+--- !u!1 &869097756
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 869097758}
+  - component: {fileID: 869097757}
+  m_Layer: 0
+  m_Name: BubbleGridManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &869097757
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 869097756}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc10ca35b4ea5734c85a480a7c8456de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BubbleGridManager
+  rows: 12
+  cols: 6
+  initialOccupiedRows: 4
+  useStaggeredRows: 1
+  autoSyncWithStageLayout: 1
+  topLeftCellWorldPosition: {x: -2.512303, y: 2.4791548, z: 0}
+  cellSpacing: 1.0106831
+  registerSceneBubblesOnStart: 1
+  drawDebugSlots: 1
+--- !u!4 &869097758
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 869097756}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.09121, y: -0.60073, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &944803801
 GameObject:
   m_ObjectHideFlags: 0
@@ -1667,10 +1751,8 @@ GameObject:
   - component: {fileID: 1527810807}
   - component: {fileID: 1527810809}
   - component: {fileID: 1527810810}
-  - component: {fileID: 1527810811}
-  - component: {fileID: 1527810812}
-  - component: {fileID: 1527810813}
-  - component: {fileID: 1527810814}
+  - component: {fileID: 1527810815}
+  - component: {fileID: 1527810817}
   m_Layer: 6
   m_Name: ' ShooterRoot'
   m_TagString: Untagged
@@ -1693,6 +1775,17 @@ MonoBehaviour:
   shooterSprite: {fileID: 21300000, guid: 90ea79c10a91b2a429527c0e3ed77a63, type: 3}
   shooterRenderer: {fileID: 1129255325}
   sortingOrder: 10
+  useGridTargetShooting: 1
+  aimController: {fileID: 1527810815}
+  gridManager: {fileID: 869097757}
+  firePoint: {fileID: 490111217}
+  bubbleColor: {r: 1, g: 1, b: 1, a: 1}
+  projectileMoveSpeed: 15
+  projectileScale: 0.45
+  showBubblePreviews: 1
+  nextBubbleController: {fileID: 1527810817}
+  currentBubblePreviewOffset: {x: 0, y: 0}
+  currentBubblePreviewScale: 0.25
 --- !u!4 &1527810808
 Transform:
   m_ObjectHideFlags: 0
@@ -1707,6 +1800,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1129255326}
+  - {fileID: 490111217}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1527810809
@@ -1760,7 +1854,7 @@ MonoBehaviour:
   textureRepeatCount: 8
   sortingOrder: 20
   aimLocalDirection: {x: 0, y: 1}
---- !u!114 &1527810811
+--- !u!114 &1527810815
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1769,26 +1863,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 1527810806}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cb5b207f1e77d3b49a9b8473f0047492, type: 3}
+  m_Script: {fileID: 11500000, guid: cb8197cd51d2cdd46ab4b498d7b0cbd2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BubbleCurrentController
-  bubbleSprites:
-  - {fileID: 21300000, guid: 74cc98222320f0c4d9c66d63fe2d2f84, type: 3}
-  - {fileID: 21300000, guid: d5965a1e010f9e2409cfc329f9b1140a, type: 3}
-  - {fileID: 21300000, guid: 2931195512212bc478f0798d0a9f3ff0, type: 3}
-  useGeneratedCircleSprites: 0
-  bubbleColors:
-  - {r: 1, g: 0, b: 0, a: 1}
-  - {r: 0, g: 0, b: 1, a: 1}
-  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  useRandomColor: 0
-  useRandomBubble: 1
-  showCurrentBubble: 1
-  sortingOrder: 200
-  bubbleLocalPosition: {x: 0, y: 1.43}
-  matchStageBubbleSize: 1
-  bubbleScale: 0.3
---- !u!114 &1527810812
+  m_EditorClassIdentifier: Assembly-CSharp::AimController
+  firePoint: {fileID: 490111217}
+  targetCamera: {fileID: 519420031}
+  visibleAimLineController: {fileID: 1527810810}
+--- !u!114 &1527810817
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1804,50 +1885,13 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 74cc98222320f0c4d9c66d63fe2d2f84, type: 3}
   - {fileID: 21300000, guid: d5965a1e010f9e2409cfc329f9b1140a, type: 3}
   - {fileID: 21300000, guid: 2931195512212bc478f0798d0a9f3ff0, type: 3}
-  useGeneratedCircleSprites: 0
-  bubbleColors:
-  - {r: 1, g: 0, b: 0, a: 1}
-  - {r: 0, g: 0, b: 1, a: 1}
-  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  useRandomColor: 0
   useRandomBubble: 1
+  nextBubbleParent: {fileID: 1129255326}
   showNextBubble: 1
   sortingOrder: 200
-  nextBubbleLocalPosition: {x: -1.5, y: -0.35}
-  matchStageBubbleSize: 1
-  nextBubbleSizeRatio: 0.7
-  nextBubbleScale: 0.2
---- !u!114 &1527810813
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1527810806}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c26a721daf03214ea92750413d2f655, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BubbleSwapController
-  useTestKey: 1
---- !u!114 &1527810814
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1527810806}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa561cc6ffc96d146ab2a3528dece731, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BubbleLauncherController
-  launchSpeed: 15
-  bounciness: 1
-  stageBubbleLayerMask:
-    serializedVersion: 2
-    m_Bits: 64
-  useSpaceKeyToLaunch: 0
+  nextBubbleLocalPosition: {x: -0, y: -1.04}
+  nextBubbleScale: 0.5
+  bubbleTintColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1528846529
 GameObject:
   m_ObjectHideFlags: 0
@@ -2694,3 +2738,4 @@ SceneRoots:
   - {fileID: 396913423}
   - {fileID: 1527810808}
   - {fileID: 944803803}
+  - {fileID: 869097758}

@@ -21,14 +21,16 @@ Unity 프로젝트 폴더:
 현재 상태:
 - 기능 1번~32번은 완료했어. (22번 모바일 터치는 패스)
 - 기능 32번 "같은 색 3개 이상 찾기" 테스트는 완료했어.
-- BubbleLauncherController.cs가 있고 ShooterRoot에 붙어 있어.
-- 발사된 버블은 벽에 반사되고, 스테이지 버블이나 천장에 닿으면 격자 위치에 정렬되어 붙어.
-- 발사된 버블이 멈추면 StageBubbleLayout 자식으로 들어가고 이름이 Bubble_Stopped가 돼.
-- 기능 31에서 같은 색 찾기 함수가 들어가 있어.
-- 기능 32에서 같은 색으로 연결된 버블 개수를 세고, 3개 이상/3개 미만을 Debug.Log로 출력해.
-- 기능 32에서 FindConnectedSameColorBubbles(), FindSameColorNeighbors(), FindAdjacentBubbles() 같은 함수가 있어.
+- 현재 발사 시스템은 Grid 기반으로 동작해:
+  - ShooterController.cs가 발사를 담당해.
+  - BubbleGridManager.cs가 격자 칸(BubbleSlot) 관리, 버블 등록, 같은 색 찾기를 담당해.
+  - BubbleProjectile.cs가 target cell까지 이동한 뒤 gridManager.RegisterBubble(targetSlot, gameObject)를 호출해.
+  - RegisterBubble() 안에서 CheckThreeOrMoreSameColorBubbles(slot)이 호출돼.
+  - 기능 32에서 연결된 같은 색 개수를 세고 Debug.Log로 출력하는 것까지 완성했어.
 - 아직 버블 제거 기능은 만들지 않았어.
-- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블, 다음 버블, 바꾸기, 발사, 벽 반사, 천장에 붙기, 버블에 붙기, 버블 위치 정렬, 같은 색 찾기, 같은 색 3개 이상 찾기 기능은 절대 망가뜨리지 말아줘.
+- BubbleLauncherController.cs는 구식 물리 발사 스크립트이고 현재는 사용하지 않아. 수정하지 마.
+- BubbleCurrentController.cs는 이미 제거됐어.
+- 기존 배경, 타이머, 게이지, 점수, 슈터, 조준선, 현재 버블, 다음 버블, 발사, 격자, 같은 색 찾기 기능은 절대 망가뜨리지 말아줘.
 - EventSystem은 삭제된 상태야. 이번 기능에는 필요 없으면 만들지 마.
 
 목표:
@@ -40,7 +42,7 @@ Unity 프로젝트 폴더:
 - 이번에는 기능 33번 "같은 색이 2개 이하면 제거하지 않기"만 만들어줘.
 - 실제 버블 제거는 아직 만들지 마. 제거는 기능 34번에서 할 거야.
 - 점수 증가도 아직 만들지 마. 점수는 기능 35번에서 할 거야.
-- 기능 32에서 세어둔 같은 색 연결 개수를 사용해줘.
+- BubbleGridManager.cs의 CheckThreeOrMoreSameColorBubbles() 함수를 수정해줘.
 - 연결 개수가 3개 이상이면 "나중에 제거 대상"이라고 Debug.Log만 출력해줘.
 - 연결 개수가 1개 또는 2개면 "제거하지 않음"이라고 Debug.Log를 출력해줘.
 - 연결 개수가 1개 또는 2개일 때 버블은 반드시 그대로 남아 있어야 해.
@@ -52,14 +54,14 @@ Unity 프로젝트 폴더:
 - 어려운 영어 용어가 나오면 한국말 뜻도 같이 설명해줘.
 
 코드 작성 조건:
-- 가능하면 BubbleLauncherController.cs만 수정해줘.
+- BubbleGridManager.cs만 수정해줘.
 - 새 스크립트가 꼭 필요하지 않으면 만들지 마.
-- 기능 32의 CheckThreeOrMoreSameColorBubbles() 또는 비슷한 함수를 정리해서 기능 33 조건까지 포함해줘.
+- BubbleGridManager.cs의 CheckThreeOrMoreSameColorBubbles() 함수를 정리해서 기능 33 조건까지 포함해줘.
 - 함수 이름은 초보자가 읽기 쉬운 이름으로 해줘. 예: CheckMatchRule, ShouldRemoveBubblesLater.
 - 아직 실제 삭제는 하지 않으므로 함수 이름에 Remove가 들어가도 실제 Destroy는 하지 마.
 - 같은 색 연결 목록이 3개 이상인지 2개 이하인지 명확하게 나눠줘.
 - 2개 이하면 반드시 아무 동작도 하지 않고 로그만 출력해줘.
-- 기존 GetVisibleBubbleColor(), IsSameColor(), GetColorName() 함수는 유지해줘.
+- BubbleGridManager.cs의 IsSameBubbleColor(), GetBubbleColorName() 함수는 유지해줘.
 - [Header("한글 설명")]을 사용할 수 있는 새 Inspector 변수에는 한글 설명을 넣어줘.
 - [Tooltip("초보자용 설명")]도 한글로 추가해줘.
 - 변수 이름은 Unity/C# 규칙 때문에 영어로 유지해줘.
@@ -67,6 +69,9 @@ Unity 프로젝트 폴더:
 - 어려운 문법보다 쉬운 문법으로 작성해줘.
 - 기존 기능을 크게 갈아엎지 말고, 필요한 부분만 최소 수정해줘.
 - 기존 배경, 타이머, 게이지, 점수, 슈터 조준, 조준선, 현재/다음 버블 기능 파일은 가능하면 건드리지 마.
+- GameObject.Find() 사용 금지.
+- 하드코딩된 Tag 사용 금지.
+- 외부 객체 참조는 반드시 [SerializeField] 또는 Interface 사용.
 
 중요한 테스트 상황:
 - 같은 색 1개만 있으면 Console에 "제거하지 않음"이 출력되고 버블이 남아 있는지 확인.
@@ -109,6 +114,7 @@ Unity 프로젝트 폴더:
 - ShooterRoot, WallsRoot, LeftWall, RightWall, Ceiling 위치를 자동으로 바꾸지 마.
 - 자동 세팅 메뉴는 만들지 마.
 - EventSystem은 다시 만들지 마.
+- BubbleLauncherController.cs는 구식 스크립트이니 수정하지 마.
 ```
 
 ## 사용 방법
