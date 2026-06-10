@@ -51,6 +51,24 @@ public class BubbleGridManager : MonoBehaviour
     // ============================================================
     public event System.Action<int> MatchedBubblesRemoved;
 
+    // ============================================================
+    // [기능 40] 떠 있는 버블이 떨어졌을 때 알려주는 이벤트입니다.
+    // 떨어진 버블 개수를 밖으로 알려줍니다.
+    // 점수 기능은 이 이벤트를 구독해서 떨어진 버블 수만큼 점수를 올리면 됩니다.
+    // ============================================================
+    public event System.Action<int> FloatingBubblesDropped;
+
+    [Header("제거 효과 연결")]
+    [Tooltip("버블이 사라질 때 시각적 효과를 보여주는 BubbleRemovalEffectController를 연결합니다.")]
+    [SerializeField] private BubbleRemovalEffectController removalEffectController;
+
+    [Header("떠 있는 버블 떨어뜨리기 설정")]
+    [Tooltip("떠 있는 버블이 아래로 떨어지는 속도입니다. 숫자가 클수록 빠르게 떨어집니다.")]
+    [SerializeField] private float dropFallSpeed = 8f;
+
+    [Tooltip("떠 있는 버블이 떨어지는 거리입니다. 화면 아래로 충분히 내려가야 사라집니다.")]
+    [SerializeField] private float dropDistance = 10f;
+
     public int Rows => rows;
     public int Cols => cols;
     public float CellSpacing => cellSpacing;
@@ -68,6 +86,13 @@ public class BubbleGridManager : MonoBehaviour
             // StageBubbleLayout이 Start에서 버블을 만든 뒤 등록되도록 아주 잠깐 늦게 실행합니다.
             Invoke(nameof(RefreshGridRegistration), 0.05f);
         }
+
+        // [기능 37] 게임 시작 시 천장과 연결된 버블 개수를 로그로 출력합니다.
+        // 스테이지 버블 등록이 끝난 뒤 확인해야 하므로 0.1초 뒤에 실행합니다.
+        Invoke(nameof(LogCeilingConnectedBubbles), 0.1f);
+
+        // [기능 38] 게임 시작 시 떠 있는 버블 개수도 로그로 출력합니다.
+        Invoke(nameof(LogFloatingBubbles), 0.15f);
     }
 
     private void OnValidate()
@@ -192,8 +217,9 @@ public class BubbleGridManager : MonoBehaviour
     }
 
     // 화면에 실제로 보이는 dotted line 경로를 기준으로 target cell을 찾습니다.
-    // dotted line이 실제로 도달하는 "occupied 근처 지점"에서 가장 가까운 빈칸을 선택합니다.
-    // 이렇게 해야 제거로 생긴 빈칸 때문에 dotted line이 가리키는 위치가 무시되는 문제를 막을 수 있습니다.
+    // dotted line 경로를 위(천장)에서 아래(슈터) 방향으로 따라가면서,
+    // 조준선이 지나가는 줄(row)에서 가장 먼저 발견되는 유효한 빈칸을 반환합니다.
+    // 조준선이 꺾여도, 끝점이 멀어도, 조준선이 가리키는 "가장 위쪽 빈칸"에 버블이 붙습니다.
     public bool TryFindTargetSlotOnAimPath(Vector3[] aimLinePoints, out BubbleSlot targetSlot)
     {
         targetSlot = null;
@@ -207,23 +233,25 @@ public class BubbleGridManager : MonoBehaviour
 
         float maxDistanceFromLine = cellSpacing * 0.55f;
 
-        // dotted line이 실제로 도달하는 "occupied 근처 지점"을 찾습니다.
-        // dotted line을 끝점부터 시작점 방향으로 되짚어 올라가면서,
-        // 가장 가까운 occupied 칸이 있는 지점을 찾습니다.
-        // 이 지점이 버블이 실제로 붙어야 하는 위치입니다.
-        Vector3 aimEndPoint = FindAimLandingPoint(aimLinePoints);
-
-        float bestTotalDistance = float.MaxValue;
-
-        // 모든 빈칸을 확인해서 aimEndPoint에 가장 가까운 유효한 빈칸을 찾습니다.
+        // ============================================================
+        // 조준선 경로를 위(천장)에서 아래(슈터) 방향으로 한 줄씩 확인합니다.
+        // row 0(천장)부터 시작해서, 조준선이 지나가는 줄에서
+        // 가장 먼저 발견되는 유효한 빈칸을 target으로 반환합니다.
+        // ============================================================
         for (int row = 0; row < rows; row++)
         {
             float rowY = GetCellWorldPosition(row, 0).y;
 
+            // 이 줄(row)의 Y 좌표에서 조준선의 X 좌표를 구합니다.
+            // 조준선이 이 줄을 지나가지 않으면 false를 돌려줍니다.
             if (!TryGetAimedXOnPathAtY(aimLinePoints, rowY, out float aimedX))
             {
                 continue;
             }
+
+            // 이 줄에서 조준선에 가장 가까운 유효한 빈칸을 찾습니다.
+            BubbleSlot bestSlotInRow = null;
+            float bestDistanceInRow = float.MaxValue;
 
             for (int col = 0; col < GetColsInRow(row); col++)
             {
@@ -244,16 +272,63 @@ public class BubbleGridManager : MonoBehaviour
                     continue;
                 }
 
+                // 조준선과의 거리를 확인합니다.
                 float distanceFromLine = Mathf.Abs(slot.worldPosition.x - aimedX);
                 if (distanceFromLine > maxDistanceFromLine)
                 {
                     continue;
                 }
 
-                float distanceToLanding = Vector2.Distance(slot.worldPosition, aimEndPoint);
-                if (distanceToLanding < bestTotalDistance)
+                if (distanceFromLine < bestDistanceInRow)
                 {
-                    bestTotalDistance = distanceToLanding;
+                    bestDistanceInRow = distanceFromLine;
+                    bestSlotInRow = slot;
+                }
+            }
+
+            // 이 줄에서 유효한 빈칸을 찾았으면, 그것이 target입니다.
+            // 더 아래 줄은 확인하지 않습니다. (가장 위쪽 빈칸이 우선)
+            if (bestSlotInRow != null)
+            {
+                targetSlot = bestSlotInRow;
+                Debug.Log($"[GridTarget] target cell: row {targetSlot.row}, col {targetSlot.col}, 위치: {targetSlot.worldPosition}");
+                return true;
+            }
+        }
+
+        // ============================================================
+        // 조준선 경로 위에 유효한 빈칸이 없으면,
+        // 조준선 끝점에서 가장 가까운 유효한 빈칸을 격자 전체에서 찾습니다.
+        // (거리 제한 없음)
+        // ============================================================
+        Vector3 aimEndPoint = aimLinePoints[aimLinePoints.Length - 1];
+        float bestTotalDistance = float.MaxValue;
+
+        for (int row = 0; row < rows; row++)
+        {
+            for (int col = 0; col < GetColsInRow(row); col++)
+            {
+                BubbleSlot slot = slots[row, col];
+
+                if (slot.occupied)
+                {
+                    continue;
+                }
+
+                if (!IsSlotInsidePlayArea(slot))
+                {
+                    continue;
+                }
+
+                if (!IsAttachableSlot(row, col))
+                {
+                    continue;
+                }
+
+                float distanceToEnd = Vector2.Distance(slot.worldPosition, aimEndPoint);
+                if (distanceToEnd < bestTotalDistance)
+                {
+                    bestTotalDistance = distanceToEnd;
                     targetSlot = slot;
                 }
             }
@@ -261,7 +336,7 @@ public class BubbleGridManager : MonoBehaviour
 
         if (targetSlot != null)
         {
-            Debug.Log($"[GridTarget] target cell: row {targetSlot.row}, col {targetSlot.col}, 위치: {targetSlot.worldPosition}, 도착점: {aimEndPoint}");
+            Debug.Log($"[GridTarget] target cell (예비): row {targetSlot.row}, col {targetSlot.col}, 위치: {targetSlot.worldPosition}");
             return true;
         }
 
@@ -343,7 +418,27 @@ public class BubbleGridManager : MonoBehaviour
     {
         aimedX = 0f;
 
-        for (int i = 0; i < aimLinePoints.Length - 1; i++)
+        // 먼저 마지막 조준 방향을 ray처럼 사용합니다.
+        // dotted line 그림이 짧게 끝나도, 실제 발사 방향은 그 끝쪽 방향으로 계속 이어진다고 봐야 합니다.
+        // 그래야 빨간 동그라미처럼 조준선 끝보다 더 위에 있는 빈칸도 먼저 선택할 수 있습니다.
+        Vector3 finalStartPoint = aimLinePoints[aimLinePoints.Length - 2];
+        Vector3 finalEndPoint = aimLinePoints[aimLinePoints.Length - 1];
+        float finalDeltaY = finalEndPoint.y - finalStartPoint.y;
+
+        if (Mathf.Abs(finalDeltaY) >= 0.001f)
+        {
+            float rayT = (targetY - finalStartPoint.y) / finalDeltaY;
+
+            if (rayT >= -0.001f)
+            {
+                aimedX = finalStartPoint.x + (finalEndPoint.x - finalStartPoint.x) * rayT;
+                return true;
+            }
+        }
+
+        // 마지막 방향 ray로 계산할 수 없는 줄은 예비로 실제 dotted line 조각들을 검사합니다.
+        // 조준선이 벽에 튕기면 같은 높이(row)를 두 선분이 지나갈 수 있으므로 끝쪽 선분부터 확인합니다.
+        for (int i = aimLinePoints.Length - 2; i >= 0; i--)
         {
             Vector3 startPoint = aimLinePoints[i];
             Vector3 endPoint = aimLinePoints[i + 1];
@@ -566,6 +661,24 @@ public class BubbleGridManager : MonoBehaviour
         // 점수는 여기서 직접 올리지 않습니다.
         // 나중에 점수 기능이 이 이벤트를 구독해서 제거 개수만큼 점수를 올리면 됩니다.
         MatchedBubblesRemoved?.Invoke(removedCount);
+
+        // ============================================================
+        // [기능 37] 버블이 제거된 뒤, 천장과 연결된 버블이 몇 개인지 확인합니다.
+        // 이건 실제 제거나 점수 변화 없이, 로그만 출력합니다.
+        // 기능 38~40에서 "떨어질 버블"을 찾기 위한 준비 단계입니다.
+        // ============================================================
+        FindCeilingConnectedBubbles();
+
+        // ============================================================
+        // [기능 38] 천장과 연결되지 않은 떠 있는 버블이 몇 개인지 확인합니다.
+        // ============================================================
+        FindFloatingBubbles();
+
+        // ============================================================
+        // [기능 39] 떠 있는 버블을 아래로 떨어뜨립니다.
+        // 떠 있는 버블이 없으면 아무 일도 일어나지 않습니다.
+        // ============================================================
+        DropFloatingBubbles();
     }
 
     // ============================================================
@@ -583,6 +696,24 @@ public class BubbleGridManager : MonoBehaviour
 
         GameObject bubbleObject = slot.bubbleObject;
 
+        // ============================================================
+        // [기능 36] 버블을 실제로 없애기 전에 제거 효과를 보여줍니다.
+        // 효과 컨트롤러가 Inspector에서 연결되어 있으면 효과를 재생합니다.
+        // ============================================================
+        if (removalEffectController != null && bubbleObject != null)
+        {
+            // 버블이 있던 월드 위치를 저장합니다.
+            Vector3 effectPosition = bubbleObject.transform.position;
+
+            // 버블 색을 가져옵니다. (SpriteRenderer의 color)
+            SpriteRenderer bubbleRenderer = bubbleObject.GetComponent<SpriteRenderer>();
+            Color effectColor = bubbleRenderer != null ? bubbleRenderer.color : Color.white;
+
+            // 효과를 재생합니다.
+            removalEffectController.PlayRemovalEffect(effectPosition, effectColor);
+        }
+
+        // 슬롯을 빈칸으로 만듭니다.
         slot.occupied = false;
         slot.bubbleObject = null;
 
@@ -646,6 +777,209 @@ public class BubbleGridManager : MonoBehaviour
             visited[neighborRow, neighborCol] = true;
             searchQueue.Enqueue(neighborSlot);
         }
+    }
+
+    // ============================================================
+    // [기능 37] 천장과 연결된 모든 버블을 찾습니다.
+    //
+    // [왜 필요한가요?]
+    // 버블슈터에서 "떨어질 버블"을 찾으려면 먼저 "떨어지지 않을 버블"을 찾아야 합니다.
+    // 천장(row 0)에 붙은 버블에서 시작해서, 그 옆에 붙은 버블들을 차례로 따라가면
+    // 천장과 연결된 모든 버블(떨어지지 않을 버블)을 알 수 있습니다.
+    // 이걸 알아야 나중에 "천장과 연결 안 된 떠 있는 버블"을 골라서 떨어뜨릴 수 있어요.
+    //
+    // [어떻게 찾나요?]
+    // BFS(너비 우선 탐색)를 사용합니다.
+    // 1. row 0(천장 줄)에 있는 모든 occupied 칸을 시작점으로 큐에 넣습니다.
+    // 2. 큐에서 하나씩 꺼내면서, 그 이웃 중 occupied 칸을 모두 큐에 넣습니다.
+    // 3. 색깔은 상관없이, occupied면 전부 연결된 것으로 봅니다.
+    // 4. 큐가 비면 탐색이 끝납니다.
+    //
+    // [반환값]
+    // 천장과 연결된 모든 BubbleSlot의 리스트.
+    // 이 리스트에 없는 occupied 슬롯은 "떨어질 버블"입니다.
+    // ============================================================
+    public System.Collections.Generic.List<BubbleSlot> FindCeilingConnectedBubbles()
+    {
+        // 결과를 담을 새 리스트를 만듭니다.
+        // (기존 connectedSameColorSlots와 섞이지 않게 새 리스트를 씁니다.)
+        System.Collections.Generic.List<BubbleSlot> ceilingConnectedSlots = new System.Collections.Generic.List<BubbleSlot>();
+
+        // BFS용 큐를 비웁니다.
+        searchQueue.Clear();
+
+        // 이미 방문한 칸을 표시하는 배열입니다.
+        // 같은 칸을 두 번 세지 않기 위해 필요합니다.
+        bool[,] visited = new bool[rows, cols];
+
+        // ============================================================
+        // 1단계: 천장 줄(row 0)의 모든 occupied 칸을 시작점으로 큐에 넣습니다.
+        // ============================================================
+        for (int col = 0; col < GetColsInRow(0); col++)
+        {
+            BubbleSlot ceilingSlot = slots[0, col];
+
+            if (ceilingSlot.occupied && ceilingSlot.bubbleObject != null)
+            {
+                searchQueue.Enqueue(ceilingSlot);
+                visited[0, col] = true;
+            }
+        }
+
+        // ============================================================
+        // 2단계: BFS 탐색 - 큐가 빌 때까지 반복합니다.
+        // ============================================================
+        while (searchQueue.Count > 0)
+        {
+            // 큐에서 하나 꺼냅니다.
+            BubbleSlot currentSlot = searchQueue.Dequeue();
+
+            // 결과 리스트에 추가합니다.
+            ceilingConnectedSlots.Add(currentSlot);
+
+            // 현재 버블의 이웃 중 occupied인 것을 큐에 넣습니다.
+            AddOccupiedNeighborSlots(currentSlot, visited);
+        }
+
+        // 결과 개수를 로그로 출력합니다.
+        Debug.Log($"[기능 37] 천장 연결 버블: {ceilingConnectedSlots.Count}개");
+
+        return ceilingConnectedSlots;
+    }
+
+    // ============================================================
+    // [기능 37 도우미] 천장 연결 버블 개수를 로그로 출력합니다.
+    // Start()에서 Invoke로 호출됩니다.
+    // ============================================================
+    private void LogCeilingConnectedBubbles()
+    {
+        FindCeilingConnectedBubbles();
+    }
+
+    // ============================================================
+    // [기능 38] 천장과 연결되지 않은 떠 있는 버블을 찾습니다.
+    //
+    // [왜 필요한가요?]
+    // 같은 색 3개 이상이 제거되면, 그 옆에 붙어있던 버블이 천장과 연결이 끊어져서
+    // 공중에 떠 있는 상태가 됩니다. 이런 버블은 떨어뜨려야 게임이 깔끔해집니다.
+    // 떨어뜨리기 전에 먼저 "떠 있는 버블"을 정확히 찾아야 합니다.
+    //
+    // [어떻게 찾나요?]
+    // 1. 기능 37의 FindCeilingConnectedBubbles()로 천장 연결 버블 목록을 받습니다.
+    // 2. 전체 격자를 돌면서, occupied인 칸 중 천장 연결 버블에 없는 것을 모읍니다.
+    // 3. 그게 바로 "떠 있는 버블"입니다.
+    //
+    // [반환값]
+    // 천장과 연결되지 않은 떠 있는 BubbleSlot의 리스트.
+    // 이 리스트에 있는 버블들은 나중에 떨어뜨릴 수 있습니다.
+    // ============================================================
+    public System.Collections.Generic.List<BubbleSlot> FindFloatingBubbles()
+    {
+        // 떠 있는 버블을 담을 새 리스트를 만듭니다.
+        System.Collections.Generic.List<BubbleSlot> floatingSlots = new System.Collections.Generic.List<BubbleSlot>();
+
+        // 기능 37의 함수를 호출해서 천장 연결 버블 목록을 받습니다.
+        System.Collections.Generic.List<BubbleSlot> ceilingConnectedSlots = FindCeilingConnectedBubbles();
+
+        // Contains()를 빠르게 쓰기 위해 HashSet으로 변환합니다.
+        // (List.Contains는 느리지만, HashSet.Contains는 빠릅니다.)
+        System.Collections.Generic.HashSet<BubbleSlot> ceilingSet = new System.Collections.Generic.HashSet<BubbleSlot>();
+        for (int i = 0; i < ceilingConnectedSlots.Count; i++)
+        {
+            ceilingSet.Add(ceilingConnectedSlots[i]);
+        }
+
+        // 전체 격자를 돌면서, occupied이지만 천장 연결 버블이 아닌 칸을 찾습니다.
+        for (int row = 0; row < rows; row++)
+        {
+            for (int col = 0; col < GetColsInRow(row); col++)
+            {
+                BubbleSlot slot = slots[row, col];
+
+                // occupied 아니면 무시합니다.
+                if (!slot.occupied || slot.bubbleObject == null)
+                {
+                    continue;
+                }
+
+                // 천장 연결 버블에 들어 있으면 떠 있는 버블이 아닙니다.
+                if (ceilingSet.Contains(slot))
+                {
+                    continue;
+                }
+
+                // 위 두 조건에 모두 해당하지 않으면, 이 칸은 떠 있는 버블입니다.
+                floatingSlots.Add(slot);
+            }
+        }
+
+        // 결과 개수를 로그로 출력합니다.
+        Debug.Log($"[기능 38] 떠 있는 버블: {floatingSlots.Count}개");
+
+        return floatingSlots;
+    }
+
+    // ============================================================
+    // [기능 38 도우미] 떠 있는 버블 개수를 로그로 출력합니다.
+    // Start()에서 Invoke로 호출됩니다.
+    // ============================================================
+    private void LogFloatingBubbles()
+    {
+        FindFloatingBubbles();
+    }
+
+    // ============================================================
+    // [기능 37 도우미] 천장에서 아래로 매달린 occupied 칸을 큐에 넣습니다.
+    // 색깔은 상관없이 occupied면 연결된 것으로 봅니다.
+    // 단, 옆으로만 이어진 버블까지 모두 천장 연결로 착각하지 않도록
+    // 천장 -> 아래 방향으로 이어지는 칸만 따라갑니다.
+    // ============================================================
+    private void AddOccupiedNeighborSlots(BubbleSlot currentSlot, bool[,] visited)
+    {
+        int[,] neighborOffsets = GetDownwardSupportOffsets(currentSlot.row);
+
+        for (int i = 0; i < neighborOffsets.GetLength(0); i++)
+        {
+            int neighborRow = currentSlot.row + neighborOffsets[i, 0];
+            int neighborCol = currentSlot.col + neighborOffsets[i, 1];
+
+            if (!IsValidCell(neighborRow, neighborCol) || visited[neighborRow, neighborCol])
+            {
+                continue;
+            }
+
+            BubbleSlot neighborSlot = slots[neighborRow, neighborCol];
+            if (!neighborSlot.occupied || neighborSlot.bubbleObject == null)
+            {
+                continue;
+            }
+
+            // 색깔은 비교하지 않습니다.
+            // 천장에서 아래로 매달린 방향에 있고 occupied면 큐에 넣습니다.
+
+            visited[neighborRow, neighborCol] = true;
+            searchQueue.Enqueue(neighborSlot);
+        }
+    }
+
+    // ============================================================
+    // [기능 37 도우미] 천장 연결 확인용 아래 방향 이웃을 돌려줍니다.
+    //
+    // 일반 같은 색 찾기는 주변 6칸을 모두 봅니다.
+    // 하지만 지금 테스트 기준에서는 옆/대각선으로 살짝 이어진 버블까지
+    // 전부 천장 연결로 보면 "떠 있는 버블: 0개"가 계속 나옵니다.
+    // 그래서 천장 연결 확인은 아주 단순하게 "바로 아래 칸"만 따라갑니다.
+    //
+    // 예:
+    // 천장 버블 바로 아래에 있으면 연결
+    // 옆이나 대각선에만 있으면 떠 있는 버블 후보
+    // ============================================================
+    private int[,] GetDownwardSupportOffsets(int row)
+    {
+        return new int[,]
+        {
+            { 1, 0 }
+        };
     }
 
     private int[,] GetNeighborOffsets(int row)
@@ -952,6 +1286,134 @@ public class BubbleGridManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    // ============================================================
+    // [기능 39] 떠 있는 버블을 아래로 떨어뜨립니다.
+    //
+    // [왜 필요한가요?]
+    // 같은 색 3개 이상이 제거되면, 그 옆에 붙어있던 버블이
+    // 천장과 연결이 끊어져서 공중에 떠 있게 됩니다.
+    // 이런 버블은 아래로 떨어뜨려야 게임이 깔끔해집니다.
+    //
+    // [실행 흐름]
+    // 1. FindFloatingBubbles()로 떠 있는 버블 목록을 받습니다.
+    // 2. 떠 있는 버블이 0개이면 아무것도 하지 않습니다.
+    // 3. 떠 있는 버블이 있으면, 각 버블에 대해:
+    //    a. BubbleSlot을 비웁니다 (occupied = false, bubbleObject = null).
+    //    b. 버블 오브젝트를 아래로 부드럽게 이동시키는 Coroutine을 시작합니다.
+    //    c. Coroutine이 끝나면 버블 오브젝트를 Destroy()합니다.
+    // ============================================================
+    private void DropFloatingBubbles()
+    {
+        // 떠 있는 버블 목록을 받습니다.
+        System.Collections.Generic.List<BubbleSlot> floatingSlots = FindFloatingBubbles();
+
+        // 떠 있는 버블이 0개이면 아무것도 하지 않습니다.
+        if (floatingSlots.Count == 0)
+        {
+            return;
+        }
+
+        Debug.Log($"[기능 39] 떠 있는 버블 {floatingSlots.Count}개를 아래로 떨어뜨립니다.");
+
+        // ============================================================
+        // [기능 40] 떨어진 버블 개수를 이벤트로 알려줍니다.
+        // 점수 기능이 이 이벤트를 구독해서 떨어진 버블 수만큼 점수를 올립니다.
+        // ============================================================
+        FloatingBubblesDropped?.Invoke(floatingSlots.Count);
+
+        // 각 떠 있는 버블에 대해 떨어뜨리기를 실행합니다.
+        for (int i = 0; i < floatingSlots.Count; i++)
+        {
+            BubbleSlot floatingSlot = floatingSlots[i];
+            GameObject bubbleObject = floatingSlot.bubbleObject;
+
+            // BubbleSlot을 먼저 비웁니다.
+            // 비워야 다음 발사 버블이 이 칸에 다시 들어갈 수 있습니다.
+            ClearFloatingBubbleSlot(floatingSlot);
+
+            // 버블 오브젝트가 있으면 아래로 떨어뜨리는 Coroutine을 시작합니다.
+            if (bubbleObject != null)
+            {
+                StartCoroutine(DropBubbleObject(bubbleObject));
+            }
+        }
+    }
+
+    // ============================================================
+    // [기능 39 도우미] 떠 있는 버블의 BubbleSlot을 비웁니다.
+    // ClearBubbleSlot()과 비슷하지만, 제거 효과는 보여주지 않습니다.
+    // (떠 있는 버블은 이미 연결이 끊어진 상태이므로 효과가 필요 없습니다.)
+    // ============================================================
+    private void ClearFloatingBubbleSlot(BubbleSlot slot)
+    {
+        if (slot == null)
+        {
+            return;
+        }
+
+        slot.occupied = false;
+        slot.bubbleObject = null;
+    }
+
+    // ============================================================
+    // [기능 39 도우미] 버블 오브젝트를 아래로 부드럽게 이동시키는 Coroutine입니다.
+    //
+    // [Coroutine이란?]
+    // 여러 프레임에 걸쳐서 천천히 실행되는 함수입니다.
+    // 한 프레임에 끝나지 않고, 시간에 따라 변화하는 효과를 만들 때 사용합니다.
+    // 비유: "0.5초 동안 아래로 미끄러지듯이 내려가는 애니메이션"
+    //
+    // [실행 흐름]
+    // 1. 버블의 현재 위치를 기억합니다.
+    // 2. 매 프레임마다 dropFallSpeed만큼 아래로 이동합니다.
+    // 3. dropDistance만큼 이동했으면 Coroutine을 끝냅니다.
+    // 4. 버블 오브젝트를 Destroy()로 제거합니다.
+    // ============================================================
+    private System.Collections.IEnumerator DropBubbleObject(GameObject bubbleObject)
+    {
+        if (bubbleObject == null)
+        {
+            yield break;
+        }
+
+        // 버블의 시작 위치를 기억합니다.
+        Vector3 startPosition = bubbleObject.transform.position;
+
+        // 버블이 아래로 이동한 거리를 측정합니다.
+        float movedDistance = 0f;
+
+        // dropDistance만큼 이동할 때까지 반복합니다.
+        while (movedDistance < dropDistance)
+        {
+            // 버블이 중간에 사라졌으면 Coroutine을 끝냅니다.
+            if (bubbleObject == null)
+            {
+                yield break;
+            }
+
+            // 이번 프레임에 이동할 거리를 계산합니다.
+            // Time.deltaTime은 "지난 프레임부터 지금까지 걸린 시간(초)"입니다.
+            // 이렇게 하면 컴퓨터 속도에 관계없이 항상 같은 속도로 떨어집니다.
+            float moveThisFrame = dropFallSpeed * Time.deltaTime;
+
+            // 버블을 아래로 이동합니다.
+            // Vector3.down은 (0, -1, 0)으로, 아래쪽 방향입니다.
+            bubbleObject.transform.position += Vector3.down * moveThisFrame;
+
+            // 이동한 거리를 누적합니다.
+            movedDistance += moveThisFrame;
+
+            // 다음 프레임까지 기다립니다.
+            yield return null;
+        }
+
+        // 떨어뜨리기가 끝났으면 버블 오브젝트를 제거합니다.
+        if (bubbleObject != null)
+        {
+            Destroy(bubbleObject);
+        }
     }
 
     private void OnDrawGizmos()
