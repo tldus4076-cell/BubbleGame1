@@ -37,6 +37,10 @@ public class StageBubbleLayout : MonoBehaviour
     [Tooltip("체크하면 PNG 파일 대신 코드로 만든 깨끗한 원형 버블을 사용합니다. 정렬 테스트에는 체크를 추천합니다.")]
     public bool useGeneratedCircleSprites = true;
 
+    [Header("스테이지 데이터 연결")]
+    [Tooltip("StageDataManager를 연결하면 Inspector에 입력한 배치 패턴으로 버블을 만듭니다. 비워두면 Stage 1 기본 배치를 사용합니다.")]
+    [SerializeField] private StageDataController stageDataController;
+
     // 코드로 만든 빨강, 파랑, 노랑 원형 버블 Sprite를 저장해둡니다.
     // 이렇게 해두면 매번 새로 만들지 않아도 됩니다.
     private Sprite[] generatedCircleSprites;
@@ -185,6 +189,84 @@ public class StageBubbleLayout : MonoBehaviour
         }
     }
 
+    // StageDataController에서 받은 배치 패턴을 사용할 수 있는지 확인합니다.
+    // 연결되어 있고 패턴이 비어 있지 않으면 true를 돌려줍니다.
+    private bool HasCustomPattern()
+    {
+        // stageDataController가 Inspector에 연결되어 있는지 확인합니다.
+        if (stageDataController == null)
+        {
+            return false;
+        }
+
+        // startBubblePattern이 비어 있지 않은지 확인합니다.
+        int[] pattern = stageDataController.GetStartBubblePattern();
+        return pattern != null && pattern.Length > 0;
+    }
+
+    // StageDataController에서 받은 1차원 패턴 배열에서 특정 row, col 위치의 값을 가져옵니다.
+    // 1차원 배열을 2차원으로 읽는 함수입니다.
+    // 예: 패턴이 [0,0,1,1,2,2, 0,0,1,1,2, ...] 이면
+    //     row=0, col=0 → 0 (처음 값)
+    //     row=0, col=5 → 2 (6번째 값)
+    //     row=1, col=0 → 0 (7번째 값, 두 번째 줄 시작)
+    private int GetPatternValue(int row, int col)
+    {
+        // stageDataController에서 1차원 패턴 배열을 가져옵니다.
+        int[] pattern = stageDataController.GetStartBubblePattern();
+
+        // 패턴이 비어 있으면 기본값 0을 돌려줍니다.
+        if (pattern == null || pattern.Length == 0)
+        {
+            return 0;
+        }
+
+        // 1차원 배열에서 현재 row의 시작 위치를 계산합니다.
+        // Stage 2 추천 패턴은 줄마다 칸 수가 다릅니다: 6,5,5,4,4
+        // 각 줄의 시작 인덱스는: 0, 6, 11, 16, 20
+        // 간단한 방법: patternIndex를 0부터 세면서 순서대로 읽습니다.
+        int patternIndex = 0;
+
+        // 현재 row까지 지나온 칸 수를 계산합니다.
+        for (int r = 0; r < row; r++)
+        {
+            // r번째 줄의 칸 수를 구합니다.
+            int colsInThisRow = GetColsForPatternRow(r);
+            patternIndex += colsInThisRow;
+        }
+
+        // 현재 col을 더해서 최종 위치를 구합니다.
+        patternIndex += col;
+
+        // 패턴 범위를 벗어나면 안전하게 0을 돌려줍니다.
+        if (patternIndex >= pattern.Length)
+        {
+            return 0;
+        }
+
+        // 해당 위치의 색 번호를 돌려줍니다.
+        return pattern[patternIndex];
+    }
+
+    // 패턴에서 특정 줄의 칸 수를 돌려줍니다.
+    // Stage 1 기본 패턴: 6,5,5,4 (총 20개)
+    // Stage 2 추천 패턴: 6,5,5,4,4 (총 24개)
+    // stageDataController에서 받은 startRows와 startCols를 기준으로 계산합니다.
+    private int GetColsForPatternRow(int row)
+    {
+        // stageDataController에서 줄 수와 칸 수를 가져옵니다.
+        int startRows = stageDataController.GetStartRows();
+        int startCols = stageDataController.GetStartCols();
+
+        // 홀수 줄(1번째, 3번째...)은 버블슈터처럼 반 칸 밀리므로 칸이 하나 적습니다.
+        if (useStaggeredRows && row % 2 == 1)
+        {
+            return Mathf.Max(1, startCols - 1);
+        }
+
+        return startCols;
+    }
+
     // 실제로 버블을 만드는 함수입니다.
     private void CreateBubbles()
     {
@@ -262,14 +344,35 @@ public class StageBubbleLayout : MonoBehaviour
         // Mathf.Sqrt는 제곱근을 구하는 함수입니다.
         // 버블슈터의 지그재그 배치에서는 세로 간격을 조금 줄여야 자연스럽게 붙습니다.
 
-        // Stage 1은 기획서 기준 최대 4줄입니다.
-        int totalRows = Mathf.Min(rows, Stage1Pattern.Length);
+        // StageDataController에서 받은 패턴이 있으면 그 줄 수를 사용하고,
+        // 없으면 Stage 1 기본 패턴의 줄 수를 사용합니다.
+        int totalRows;
+        if (HasCustomPattern())
+        {
+            // stageDataController에서 받은 줄 수를 사용합니다.
+            totalRows = Mathf.Min(rows, stageDataController.GetStartRows());
+        }
+        else
+        {
+            // Stage 1 기본 패턴의 줄 수를 사용합니다.
+            totalRows = Mathf.Min(rows, Stage1Pattern.Length);
+        }
 
         // 줄 반복입니다.
         for (int row = 0; row < totalRows; row++)
         {
             // 현재 줄에 놓을 버블 개수입니다.
-            int colsInRow = Mathf.Min(cols, Stage1Pattern[row].Length);
+            int colsInRow;
+            if (HasCustomPattern())
+            {
+                // stageDataController에서 받은 패턴의 줄 칸 수를 사용합니다.
+                colsInRow = Mathf.Min(cols, GetColsForPatternRow(row));
+            }
+            else
+            {
+                // Stage 1 기본 패턴의 줄 칸 수를 사용합니다.
+                colsInRow = Mathf.Min(cols, Stage1Pattern[row].Length);
+            }
 
             // Stage1Pattern[row].Length는 현재 줄에 실제로 적혀 있는 버블 개수입니다.
 
@@ -289,6 +392,19 @@ public class StageBubbleLayout : MonoBehaviour
             // 열 반복입니다.
             for (int col = 0; col < colsInRow; col++)
             {
+                // StageDataController에서 받은 패턴이 있으면 빈칸(-1)인지 확인합니다.
+                // 빈칸이면 버블을 만들지 않고 다음 칸으로 넘어갑니다.
+                if (HasCustomPattern())
+                {
+                    int patternValue = GetPatternValue(row, col);
+
+                    // -1이면 빈칸입니다. 버블을 만들지 않고 건너뜁니다.
+                    if (patternValue == -1)
+                    {
+                        continue;
+                    }
+                }
+
                 // 이번 버블의 위치를 계산합니다.
                 float x = startX + col * finalSpacing;
                 float y = startY - row * verticalSpacing;
@@ -317,8 +433,19 @@ public class StageBubbleLayout : MonoBehaviour
                 // SpriteRenderer는 2D 이미지를 화면에 보여주는 컴포넌트입니다.
                 SpriteRenderer spriteRenderer = bubble.AddComponent<SpriteRenderer>();
 
-                // Stage1Pattern 숫자에 맞는 버블 이미지를 선택합니다.
-                int spriteIndex = Stage1Pattern[row][col] % activeBubbleSprites.Length;
+                // StageDataController에서 받은 패턴이 있으면 그 색 번호를 사용하고,
+                // 없으면 Stage 1 기본 패턴의 색 번호를 사용합니다.
+                int spriteIndex;
+                if (HasCustomPattern())
+                {
+                    // stageDataController에서 받은 패턴의 색 번호를 사용합니다.
+                    spriteIndex = GetPatternValue(row, col) % activeBubbleSprites.Length;
+                }
+                else
+                {
+                    // Stage 1 기본 패턴의 색 번호를 사용합니다.
+                    spriteIndex = Stage1Pattern[row][col] % activeBubbleSprites.Length;
+                }
                 spriteRenderer.sprite = activeBubbleSprites[spriteIndex];
 
                 // 버블 크기를 최종 크기로 적용합니다.
@@ -417,23 +544,34 @@ public class StageBubbleLayout : MonoBehaviour
         return bubbleSprites;
     }
 
-    // 코드로 빨강, 파랑, 노랑 원형 버블 Sprite를 만드는 함수입니다.
+    // 코드로 빨강, 파랑, 노랑, 초록 원형 버블 Sprite를 만드는 함수입니다.
     // PNG 파일의 투명 여백, 피벗(Pivot, 기준점), 원본 크기 문제를 피하기 위해 사용합니다.
     private Sprite[] GetGeneratedCircleSprites()
     {
+        // Inspector의 Bubble Sprites에 4개를 넣었다면 Stage 2 테스트용으로 4색을 만듭니다.
+        // 아무것도 넣지 않았거나 3개만 넣었다면 Stage 1 기본값인 3색을 사용합니다.
+        int colorCount = bubbleSprites != null ? Mathf.Max(3, bubbleSprites.Length) : 3;
+
         // 이미 한 번 만들었다면 다시 만들지 않고 그대로 사용합니다.
-        if (generatedCircleSprites != null && generatedCircleSprites.Length == 3)
+        if (generatedCircleSprites != null && generatedCircleSprites.Length == colorCount)
         {
             return generatedCircleSprites;
         }
 
-        // Stage 1은 빨강, 파랑, 노랑 3색을 사용합니다.
-        generatedCircleSprites = new[]
+        Color[] colorChoices = new[]
         {
-            CreateCircleSprite(Color.red),
-            CreateCircleSprite(Color.blue),
-            CreateCircleSprite(Color.yellow)
+            Color.red,
+            Color.blue,
+            Color.yellow,
+            Color.green,
+            Color.magenta
         };
+
+        generatedCircleSprites = new Sprite[colorCount];
+        for (int i = 0; i < generatedCircleSprites.Length; i++)
+        {
+            generatedCircleSprites[i] = CreateCircleSprite(colorChoices[i % colorChoices.Length]);
+        }
 
         return generatedCircleSprites;
     }
